@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16
+    container_name: marketing-agent-postgres
+    environment:
+      POSTGRES_DB: marketing_agents
+      POSTGRES_USER: marketing_user
+      POSTGRES_PASSWORD: marketing_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketing_user -d marketing_agents"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: marketing-agent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: marketing-agent-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://marketing_user:marketing_pass@postgres:5432/marketing_agents
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_TYPE=local
+      - LOCAL_STORAGE_PATH=/app/storage
+      - DEBUG=true
+      - ENVIRONMENT=development
+    volumes:
+      - ./backend:/app
+      - backend_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend (React)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: marketing-agent-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: npm start
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_storage:
