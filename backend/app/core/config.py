@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     # Agent configuration
     default_temperature: float = 0.7
     max_tokens: int = 4000
+    use_real_scraping: bool = True  # Enable real web scraping with fallback to mock data
 
     # Performance
     max_concurrent_campaigns: int = 10

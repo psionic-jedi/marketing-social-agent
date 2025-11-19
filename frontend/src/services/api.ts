@@ -22,6 +22,8 @@ export interface Campaign {
   completed_at: string | null;
   budget: string | null;
   launch_date: string | null;
+  current_step: string | null;
+  progress_percentage: number | null;
 }
 
 export interface CampaignCreate {

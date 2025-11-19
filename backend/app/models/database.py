@@ -59,6 +59,10 @@ class Campaign(Base):
     budget = Column(Numeric(10, 2))
     launch_date = Column(Date)
 
+    # Progress tracking fields
+    current_step = Column(String(100))  # Current agent being executed
+    progress_percentage = Column(Numeric(5, 2), default=0)  # 0-100
+
     # Relationships
     agent_executions = relationship("AgentExecution", back_populates="campaign", cascade="all, delete-orphan")
     assets = relationship("Asset", back_populates="campaign", cascade="all, delete-orphan")

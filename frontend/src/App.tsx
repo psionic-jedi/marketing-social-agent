@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CampaignForm from './components/CampaignForm';
 import CampaignResults from './components/CampaignResults';
+import CampaignProgress from './components/CampaignProgress';
 import { Campaign, CampaignResults as CampaignResultsType, campaignService } from './services/api';
 import './App.css';
 
@@ -46,9 +47,20 @@ function App() {
   const handleCampaignCreated = (campaign: Campaign) => {
     setCampaigns([campaign, ...campaigns]);
     setSelectedCampaign(campaign.id);
-    // Poll for results
-    setTimeout(() => loadCampaignResults(campaign.id), 2000);
   };
+
+  const handleProgressComplete = () => {
+    // Reload campaigns list
+    loadCampaigns();
+    // Load results
+    if (selectedCampaign) {
+      loadCampaignResults(selectedCampaign);
+    }
+  };
+
+  // Get the selected campaign object
+  const selectedCampaignObj = campaigns.find(c => c.id === selectedCampaign);
+  const isRunning = selectedCampaignObj?.status === 'running' || selectedCampaignObj?.status === 'pending';
 
   return (
     <div className="app">
@@ -118,9 +130,14 @@ function App() {
             )}
           </aside>
 
-          {/* Right Column - Results */}
+          {/* Right Column - Progress or Results */}
           <section className="content">
-            {isLoading ? (
+            {isRunning && selectedCampaign ? (
+              <CampaignProgress
+                campaignId={selectedCampaign}
+                onComplete={handleProgressComplete}
+              />
+            ) : isLoading ? (
               <div className="loading-state">
                 <div className="loading-spinner"></div>
                 <p>Loading campaign results...</p>

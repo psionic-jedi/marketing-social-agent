@@ -23,9 +23,13 @@ logger = logging.getLogger(__name__)
 class ResearchAgent:
     """Research agent for gathering product and market intelligence."""
 
-    def __init__(self, use_mock_data: bool = False):
+    def __init__(self, use_mock_data: bool = None):
         self.anthropic = Anthropic(api_key=settings.anthropic_api_key)
-        self.use_mock_data = use_mock_data or settings.environment == "development"
+        # Use config setting if not explicitly provided
+        if use_mock_data is None:
+            self.use_mock_data = not settings.use_real_scraping
+        else:
+            self.use_mock_data = use_mock_data
 
     def execute(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
@@ -49,10 +53,10 @@ class ResearchAgent:
                 products = self._get_mock_products()
                 category_insights = self._get_mock_insights()
             else:
-                # Step 1: Scrape category page (with timeout)
+                # Step 1: Scrape category page (with 60s timeout)
                 logger.info(f"Scraping category page: {state['category_url']}")
                 try:
-                    html_content = self._scrape_page(state["category_url"], timeout=15000)
+                    html_content = self._scrape_page(state["category_url"])
                 except Exception as scrape_error:
                     logger.warning(f"Scraping failed, falling back to mock data: {scrape_error}")
                     products = self._get_mock_products()
@@ -103,39 +107,90 @@ class ResearchAgent:
             state["progress_percentage"] = 30  # Still advance progress
             return state
 
-    def _scrape_page(self, url: str, timeout: int = 30000) -> str:
+    def _scrape_page(self, url: str, timeout: int = 60000) -> str:
         """
         Scrape a web page using Playwright.
 
         Args:
             url: URL to scrape
-            timeout: Timeout in milliseconds
+            timeout: Timeout in milliseconds (default: 60 seconds)
 
         Returns:
             HTML content of the page
         """
+        browser = None
+        page = None
+
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
-                page = browser.new_page()
-                page.goto(url, timeout=timeout, wait_until="networkidle")
+                # Launch browser with anti-detection settings
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox'
+                    ]
+                )
 
-                # Wait for content to load
-                page.wait_for_load_state("domcontentloaded")
+                # Create context with realistic browser settings
+                context = browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                )
+
+                page = context.new_page()
+
+                # Set default navigation timeout
+                page.set_default_navigation_timeout(timeout)
+                page.set_default_timeout(timeout)
+
+                # Navigate to URL with lenient wait condition
+                logger.info(f"Navigating to {url} with {timeout}ms timeout")
+                page.goto(url, wait_until="domcontentloaded")
+
+                # Wait for dynamic content to load
+                page.wait_for_timeout(3000)
 
                 # Get page content
                 html_content = page.content()
+                logger.info(f"Successfully scraped {url} ({len(html_content)} bytes)")
 
                 browser.close()
                 return html_content
 
-        except PlaywrightTimeoutError:
-            logger.warning(f"Timeout scraping {url}, using partial content")
-            # Return whatever we got
-            return page.content() if 'page' in locals() else ""
+        except PlaywrightTimeoutError as e:
+            logger.warning(f"Timeout scraping {url} after {timeout}ms: {e}")
+            # Try to get whatever content was loaded
+            try:
+                if page:
+                    content = page.content()
+                    if browser:
+                        browser.close()
+                    if content and len(content) > 1000:
+                        logger.info(f"Returning partial content ({len(content)} bytes)")
+                        return content
+            except Exception as partial_error:
+                logger.error(f"Could not get partial content: {partial_error}")
+
+            # Clean up
+            if browser:
+                try:
+                    browser.close()
+                except:
+                    pass
+
+            raise  # Re-raise to trigger fallback to mock data
+
         except Exception as e:
-            logger.error(f"Error scraping {url}: {e}")
-            raise
+            logger.error(f"Error scraping {url}: {e}", exc_info=True)
+            # Close browser if it exists
+            if browser:
+                try:
+                    browser.close()
+                except:
+                    pass
+            raise  # Re-raise to trigger fallback to mock data
 
     def _parse_products(self, html_content: str, url: str) -> List[Dict]:
         """

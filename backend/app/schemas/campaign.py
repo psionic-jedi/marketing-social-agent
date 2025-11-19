@@ -36,6 +36,8 @@ class CampaignResponse(BaseModel):
     completed_at: Optional[datetime]
     budget: Optional[Decimal]
     launch_date: Optional[date]
+    current_step: Optional[str] = None
+    progress_percentage: Optional[Decimal] = None
 
     model_config = {
         "from_attributes": True

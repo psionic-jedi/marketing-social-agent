@@ -22,7 +22,7 @@ class CampaignService:
     """Service for managing marketing campaigns."""
 
     def __init__(self):
-        self.overlord = OverlordAgent()
+        self.overlord = None  # Will be initialized with callback in execute_campaign
 
     async def execute_campaign(self, campaign_id: uuid.UUID, db: Session) -> dict:
         """
@@ -47,6 +47,22 @@ class CampaignService:
             campaign.status = CampaignStatus.RUNNING
             db.commit()
 
+            # Create progress callback to update campaign in database
+            def update_progress(campaign_id_str: str, current_step: str, progress: float):
+                """Update campaign progress in database."""
+                try:
+                    # Refresh campaign object to get latest state
+                    db.refresh(campaign)
+                    campaign.current_step = current_step
+                    campaign.progress_percentage = progress
+                    db.commit()
+                    logger.info(f"Campaign {campaign_id} progress: {current_step} ({progress}%)")
+                except Exception as e:
+                    logger.error(f"Failed to update progress: {e}")
+
+            # Create overlord with progress callback
+            overlord = OverlordAgent(progress_callback=update_progress)
+
             # Create initial state
             initial_state = create_initial_state(
                 campaign_id=str(campaign.id),
@@ -57,7 +73,7 @@ class CampaignService:
 
             # Execute workflow
             logger.info(f"Executing Overlord workflow for campaign {campaign_id}")
-            final_state = await self.overlord.execute_async(initial_state)
+            final_state = await overlord.execute_async(initial_state)
 
             # Save results to database
             await self._save_results(campaign_id, final_state, db)
@@ -69,6 +85,8 @@ class CampaignService:
                 campaign.status = CampaignStatus.COMPLETED
 
             campaign.completed_at = datetime.utcnow()
+            campaign.current_step = "completed"
+            campaign.progress_percentage = 100.0
             db.commit()
 
             logger.info(f"Campaign {campaign_id} execution completed")
