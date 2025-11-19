@@ -162,6 +162,13 @@ class ResearchAgent:
                 await page.wait_for_timeout(3000)
                 logger.info(f"[SCRAPER] Dynamic content wait complete")
 
+                # Scroll the page to load more products (many sites lazy-load)
+                logger.info(f"[SCRAPER] Scrolling page to load more products...")
+                for i in range(3):
+                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    await page.wait_for_timeout(1000)
+                logger.info(f"[SCRAPER] Page scrolling complete")
+
                 # Get page content
                 logger.info(f"[SCRAPER] Extracting page content...")
                 html_content = await page.content()
@@ -228,14 +235,21 @@ class ResearchAgent:
 
 URL: {url}
 
-Extract as many products as you can find (aim for 8-15 products), including:
+Extract as many products as you can find (aim for at least 20 products if available), including:
 - Product name
 - Price (if available, convert to numeric format)
 - Brief description (if available)
 - Any key features mentioned
 
-HTML content (first 10000 chars):
-{html_content[:10000]}
+Look for common HTML patterns like:
+- Product cards/tiles
+- Product list items
+- Data attributes (data-product, data-price, etc.)
+- Price elements (class names with 'price', 'cost', etc.)
+- Product name elements (h2, h3, product titles)
+
+HTML content (first 30000 chars):
+{html_content[:30000]}
 
 IMPORTANT: Return ONLY valid JSON, no other text. Format:
 {{
@@ -249,12 +263,13 @@ IMPORTANT: Return ONLY valid JSON, no other text. Format:
   ]
 }}
 
+Extract as many products as possible. If you find fewer than 20, extract all you can find.
 If you can't find specific products, return {{"products": [], "explanation": "reason"}}"""
 
         try:
             response = self.anthropic.messages.create(
                 model="claude-sonnet-4-5-20250929",
-                max_tokens=4000,
+                max_tokens=8000,
                 temperature=0.3,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -310,22 +325,90 @@ If you can't find specific products, return {{"products": [], "explanation": "re
                 "unique_selling_points": []
             }
 
-        # Calculate price statistics
-        prices = [p.get("price", 0) for p in products if p.get("price")]
-        price_range = {
-            "min": min(prices) if prices else 0,
-            "max": max(prices) if prices else 0,
-            "avg": sum(prices) / len(prices) if prices else 0
-        }
+        # Use Claude to analyze the ENTIRE page for comprehensive pricing
+        prompt = f"""Analyze this category page HTML to extract comprehensive pricing data.
 
-        # Extract common features
+Look through ALL price elements on the page (not just a sample) and provide:
+1. Minimum price found
+2. Maximum price found
+3. Average/typical price
+4. Total number of products visible on the page
+5. Category name (extract from page title, breadcrumbs, or headings)
+
+HTML content (first 30000 chars):
+{html_content[:30000]}
+
+IMPORTANT: Return ONLY valid JSON:
+{{
+  "category_name": "extracted category name",
+  "total_products_on_page": 50,
+  "min_price": 9.99,
+  "max_price": 99.99,
+  "avg_price": 34.99
+}}
+
+If you can't find prices, use the sample products data as fallback."""
+
+        try:
+            response = self.anthropic.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=1000,
+                temperature=0.3,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            import json
+            response_text = response.content[0].text.strip()
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            page_data = json.loads(response_text)
+
+            price_range = {
+                "min": page_data.get("min_price") or 0,
+                "max": page_data.get("max_price") or 0,
+                "avg": page_data.get("avg_price") or 0
+            }
+
+            total_products = page_data.get("total_products_on_page", len(products))
+            category_name = page_data.get("category_name", "Children's Clothing Category")
+
+            # If Claude couldn't find prices, fall back to sample product prices
+            if price_range['min'] == 0 and price_range['max'] == 0:
+                prices = [p.get("price", 0) for p in products if p.get("price")]
+                if prices:
+                    price_range = {
+                        "min": min(prices),
+                        "max": max(prices),
+                        "avg": sum(prices) / len(prices)
+                    }
+                    logger.info(f"Using sample product prices: £{price_range['min']}-£{price_range['max']}")
+
+            logger.info(f"Page analysis: {total_products} products, £{price_range['min']:.2f}-£{price_range['max']:.2f}")
+
+        except Exception as e:
+            logger.error(f"Error analyzing full page, using sample data: {e}", exc_info=True)
+            # Fallback to sample product prices
+            prices = [p.get("price", 0) for p in products if p.get("price")]
+            price_range = {
+                "min": min(prices) if prices else 0,
+                "max": max(prices) if prices else 0,
+                "avg": sum(prices) / len(prices) if prices else 0
+            }
+            total_products = len(products)
+            category_name = "Children's Clothing Category"
+
+        # Extract common features from sample products
         all_features = []
         for product in products:
             all_features.extend(product.get("features", []))
 
         return {
-            "category_name": "Children's Clothing Category",
-            "total_products": len(products),
+            "category_name": category_name,
+            "total_products": total_products,
             "price_range": price_range,
             "common_features": list(set(all_features))[:5],
             "unique_selling_points": [
@@ -412,7 +495,7 @@ Format as a clear list."""
         }
 
     def _get_mock_products(self) -> List[Dict]:
-        """Get mock product data for testing."""
+        """Get mock product data for testing (expanded to 20+ products)."""
         return [
             {
                 "name": "Organic Cotton Baby Sleepsuit",
@@ -448,6 +531,96 @@ Format as a clear list."""
                 "sizes": ["0-3m", "3-6m", "6-9m", "9-12m", "12-18m"],
                 "description": "Versatile sleepsuit suitable for all seasons",
                 "features": ["Adaptive fabric", "Year-round comfort", "Durable construction", "Wide size range"]
+            },
+            {
+                "name": "Velour Baby Sleepsuit",
+                "price": 16.99,
+                "description": "Soft velour fabric for ultimate comfort",
+                "features": ["Plush velour", "Front zip", "Fold-over mitts", "Luxury feel"]
+            },
+            {
+                "name": "Striped Cotton Sleepsuit",
+                "price": 9.99,
+                "description": "Classic striped design in soft cotton",
+                "features": ["100% cotton", "Envelope neck", "Nickel-free poppers", "Easy care"]
+            },
+            {
+                "name": "Footed Sleepsuit with Hood",
+                "price": 13.99,
+                "description": "Cozy hooded sleepsuit with integrated feet",
+                "features": ["Hooded design", "Non-slip feet", "Two-way zip", "Extra warmth"]
+            },
+            {
+                "name": "Sleeveless Sleep Sack",
+                "price": 19.99,
+                "description": "Safe sleeping bag alternative to blankets",
+                "features": ["TOG rated", "Sleeveless design", "Zip closure", "Safe sleep"]
+            },
+            {
+                "name": "Ribbed Knit Sleepsuit",
+                "price": 17.99,
+                "description": "Stretchy ribbed knit for growing babies",
+                "features": ["Ribbed texture", "Stretchy fit", "Organic cotton", "Grows with baby"]
+            },
+            {
+                "name": "Animal Print Sleepsuit",
+                "price": 11.99,
+                "description": "Adorable animal-themed sleepsuit",
+                "features": ["Fun animal prints", "Soft cotton", "Easy poppers", "Machine washable"]
+            },
+            {
+                "name": "Thermal Sleepsuit",
+                "price": 14.99,
+                "description": "Extra warm sleepsuit for cold nights",
+                "features": ["Thermal fabric", "Heat retention", "Cozy lining", "Winter essential"]
+            },
+            {
+                "name": "Kimono Style Sleepsuit",
+                "price": 13.99,
+                "description": "Easy-dress kimono wrap design",
+                "features": ["No overhead dressing", "Newborn friendly", "Soft ties", "Gentle on skin"]
+            },
+            {
+                "name": "Two-Way Zip Sleepsuit",
+                "price": 12.99,
+                "description": "Convenient two-way zipper for easy changes",
+                "features": ["Dual zip", "Quick changes", "Soft cotton", "Practical design"]
+            },
+            {
+                "name": "Patterned Twin Pack",
+                "price": 22.99,
+                "description": "Value pack with two coordinating sleepsuits",
+                "features": ["2-pack value", "Mix and match", "Coordinating prints", "Great value"]
+            },
+            {
+                "name": "Sleepsuit with Mitts",
+                "price": 11.99,
+                "description": "Integrated scratch mitts for newborns",
+                "features": ["Fold-over mitts", "Scratch protection", "Soft seams", "Newborn essential"]
+            },
+            {
+                "name": "Embroidered Sleepsuit",
+                "price": 18.99,
+                "description": "Delicate embroidered details",
+                "features": ["Embroidered design", "Premium quality", "Gift-worthy", "Special occasions"]
+            },
+            {
+                "name": "Sleepsuit with Ears",
+                "price": 13.99,
+                "description": "Cute hooded design with animal ears",
+                "features": ["Animal ears", "Hood included", "Adorable design", "Photo-ready"]
+            },
+            {
+                "name": "Waffle Knit Sleepsuit",
+                "price": 15.99,
+                "description": "Textured waffle weave fabric",
+                "features": ["Waffle texture", "Breathable", "Soft cotton", "Modern design"]
+            },
+            {
+                "name": "Sleepsuit Gift Set",
+                "price": 29.99,
+                "description": "Boxed set of 3 sleepsuits with accessories",
+                "features": ["3-piece set", "Gift box", "Coordinated items", "Perfect gift"]
             }
         ]
 

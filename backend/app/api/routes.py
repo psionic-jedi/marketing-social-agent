@@ -162,6 +162,7 @@ async def get_campaign_results(
 
     return {
         "campaign_id": str(campaign_id),
+        "category_url": campaign.category_url,
         "status": campaign.status.value,
         "created_at": campaign.created_at.isoformat(),
         "completed_at": campaign.completed_at.isoformat() if campaign.completed_at else None,

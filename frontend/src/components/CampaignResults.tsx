@@ -4,9 +4,10 @@ import './CampaignResults.css';
 
 interface CampaignResultsProps {
   results: CampaignResultsType;
+  onDelete?: () => void;
 }
 
-const CampaignResults: React.FC<CampaignResultsProps> = ({ results }) => {
+const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) => {
   if (!results.results) {
     return (
       <div className="results-empty">
@@ -27,10 +28,26 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results }) => {
         <div>
           <h2>Campaign Results</h2>
           <p className="campaign-id">ID: {results.campaign_id}</p>
+          {results.category_url && (
+            <p className="campaign-url" style={{fontSize: '14px', color: '#666', marginTop: '5px'}}>
+              <strong>Analyzed URL:</strong> <a href={results.category_url} target="_blank" rel="noopener noreferrer" style={{color: '#4CAF50'}}>{results.category_url}</a>
+            </p>
+          )}
         </div>
-        <div className={`status-badge status-${results.status}`}>
-          {results.status === 'completed' && '✓ '}
-          {results.status}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className={`status-badge status-${results.status}`}>
+            {results.status === 'completed' && '✓ '}
+            {results.status}
+          </div>
+          {onDelete && (
+            <button
+              className="delete-btn delete-btn-detail"
+              onClick={onDelete}
+              title="Delete campaign"
+            >
+              🗑️ Delete
+            </button>
+          )}
         </div>
       </div>
 
@@ -147,6 +164,18 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results }) => {
               </div>
             </div>
           )}
+
+          {content_outputs.image_prompts && content_outputs.image_prompts.length > 0 && (
+            <div className="image-prompts-card">
+              <h5>Image Generation Prompts ({content_outputs.image_prompts.length})</h5>
+              {content_outputs.image_prompts.slice(0, 3).map((prompt: any, idx: number) => (
+                <div key={idx} className="meta-item">
+                  <span className="meta-label">{prompt.type}:</span>
+                  <code>{prompt.prompt}</code>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -239,16 +268,19 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results }) => {
 
           {crm_plan.welcome_series && (
             <div className="email-campaign-section">
-              <h5>Welcome Email Series</h5>
+              <h5>Welcome Email Series ({crm_plan.welcome_series.length} emails)</h5>
               <div className="email-list">
                 {crm_plan.welcome_series.slice(0, 3).map((email: any, idx: number) => (
                   <div key={idx} className="content-card">
                     <div className="email-type-badge">Email {idx + 1}</div>
-                    <h6>{email.subject}</h6>
-                    <p className="email-preview">{email.preview_text}</p>
+                    <h6>{email.subject_line || email.subject}</h6>
+                    <p className="email-preview">{email.preheader || email.preview_text}</p>
+                    <div className="email-timing">
+                      <span className="stat-label">Send timing:</span> {email.send_timing}
+                    </div>
                     {email.mjml_template && (
                       <div className="email-meta">
-                        <span className="stat-label">MJML Template Available</span>
+                        <span className="stat-label">✓ MJML Template Generated ({email.mjml_template.length} chars)</span>
                       </div>
                     )}
                   </div>

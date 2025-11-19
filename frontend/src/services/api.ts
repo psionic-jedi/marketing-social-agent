@@ -34,6 +34,7 @@ export interface CampaignCreate {
 
 export interface CampaignResults {
   campaign_id: string;
+  category_url?: string;
   status: string;
   created_at: string;
   completed_at: string | null;

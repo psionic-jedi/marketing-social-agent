@@ -66,6 +66,33 @@ function App() {
     }
   };
 
+  const handleDeleteCampaign = async (campaignId: string, event?: React.MouseEvent) => {
+    // Prevent card click when clicking delete button
+    if (event) {
+      event.stopPropagation();
+    }
+
+    if (!window.confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await campaignService.deleteCampaign(campaignId);
+
+      // If we're viewing the deleted campaign, go back to homepage
+      if (selectedCampaign === campaignId) {
+        setSelectedCampaign(null);
+        setCampaignResults(null);
+      }
+
+      // Reload campaigns list
+      loadCampaigns();
+    } catch (error) {
+      console.error('Failed to delete campaign:', error);
+      alert('Failed to delete campaign. Please try again.');
+    }
+  };
+
   // Get the selected campaign object
   const selectedCampaignObj = campaigns.find(c => c.id === selectedCampaign);
   const isRunning = selectedCampaignObj?.status === 'running' || selectedCampaignObj?.status === 'pending';
@@ -89,58 +116,86 @@ function App() {
                 </defs>
               </svg>
             </div>
-            <div>
-              <h1>Marketing Agent System</h1>
-              <p>AI-Powered Campaign Generation</p>
-            </div>
+            <h1>Marketing Agent System</h1>
           </div>
           <div className="header-right">
+            <p className="header-subtitle">AI-Powered Campaign Generation</p>
             <div className="stat-badge">
               <span className="stat-label">Total Campaigns</span>
               <span className="stat-value">{campaigns.length}</span>
             </div>
+            {selectedCampaign && (
+              <button className="nav-home-btn" onClick={() => setSelectedCampaign(null)}>
+                ← Campaigns
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="app-main">
-        <div className="main-grid">
-          {/* Left Column - Form */}
-          <aside className="sidebar">
-            <CampaignForm onCampaignCreated={handleCampaignCreated} />
-
-            {/* Campaign List */}
-            {campaigns.length > 0 && (
-              <div className="campaign-list">
-                <h3>Recent Campaigns</h3>
-                {campaigns.slice(0, 10).map((campaign: Campaign) => (
-                  <button
-                    key={campaign.id}
-                    className={`campaign-item ${selectedCampaign === campaign.id ? 'active' : ''}`}
-                    onClick={() => setSelectedCampaign(campaign.id)}
-                  >
-                    <div className="campaign-item-header">
-                      <span className="campaign-url">{new URL(campaign.category_url).hostname}</span>
-                      <span className={`status-dot status-${campaign.status}`}></span>
-                    </div>
-                    <div className="campaign-item-meta">
-                      <span className="campaign-date">
-                        {new Date(campaign.created_at).toLocaleDateString()}
-                      </span>
-                      {campaign.budget && (
-                        <span className="campaign-budget">£{campaign.budget}</span>
-                      )}
-                    </div>
-                  </button>
-                ))}
+      {/* Main Container */}
+      <div className="main-container">
+        {!selectedCampaign ? (
+          <>
+            {/* Sidebar */}
+            <aside className="sidebar">
+              <div className="sidebar-section">
+                <h3>Create New Campaign</h3>
+                <CampaignForm onCampaignCreated={handleCampaignCreated} />
               </div>
-            )}
-          </aside>
+            </aside>
 
-          {/* Right Column - Progress or Results */}
-          <section className="content">
-            {isRunning && selectedCampaign ? (
+            {/* Main Content - Campaign Grid */}
+            <main className="main-content homepage">
+              <div className="campaigns-header">
+                <h2>Your Campaigns</h2>
+              </div>
+
+              {campaigns.length === 0 ? (
+                <div className="empty-state">
+                  <h3>No campaigns yet</h3>
+                  <p>Create your first AI-powered marketing campaign using the form on the left!</p>
+                </div>
+              ) : (
+                <div className="campaigns-grid">
+                  {campaigns.map((campaign: Campaign) => (
+                    <div
+                      key={campaign.id}
+                      className={`campaign-card status-${campaign.status}`}
+                      onClick={() => setSelectedCampaign(campaign.id)}
+                    >
+                      <div className="campaign-card-header">
+                        <h3>{new URL(campaign.category_url).hostname}</h3>
+                        <span className={`status-badge badge-${campaign.status}`}>
+                          {campaign.status}
+                        </span>
+                      </div>
+                      <div className="campaign-card-url">
+                        {campaign.category_url}
+                      </div>
+                      <div className="campaign-card-footer">
+                        <span>{new Date(campaign.created_at).toLocaleDateString()}</span>
+                        {campaign.budget && <span>£{campaign.budget}</span>}
+                        {campaign.progress_percentage !== null && campaign.status !== 'completed' && (
+                          <span>{Number(campaign.progress_percentage).toFixed(0)}%</span>
+                        )}
+                        <button
+                          className="delete-btn delete-btn-card"
+                          onClick={(e) => handleDeleteCampaign(campaign.id, e)}
+                          title="Delete campaign"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </main>
+          </>
+        ) : (
+          <main className="main-content campaign-details">
+            {isRunning ? (
               <CampaignProgress
                 campaignId={selectedCampaign}
                 onComplete={handleProgressComplete}
@@ -151,20 +206,14 @@ function App() {
                 <p>Loading campaign results...</p>
               </div>
             ) : campaignResults ? (
-              <CampaignResults results={campaignResults} />
-            ) : (
-              <div className="empty-state">
-                <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                  <circle cx="32" cy="32" r="30" stroke="currentColor" strokeWidth="2" opacity="0.2"/>
-                  <path d="M32 16V32L42 42" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-                <h3>No Campaign Selected</h3>
-                <p>Create a new campaign or select one from the list to view results</p>
-              </div>
-            )}
-          </section>
-        </div>
-      </main>
+              <CampaignResults
+                results={campaignResults}
+                onDelete={() => handleDeleteCampaign(selectedCampaign)}
+              />
+            ) : null}
+          </main>
+        )}
+      </div>
     </div>
   );
 }

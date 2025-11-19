@@ -103,42 +103,61 @@ class SocialMediaAgent:
         """Generate 5-7 Instagram post concepts with captions and hashtags."""
         category_name = research_data.get("category_insights", {}).get("category_name", "Products")
         features = content_outputs.get("features", [])
+        products = research_data.get("products", [])
+        parent_questions = research_data.get("parent_questions", [])
 
         prompt = f"""Create 5 engaging Instagram post concepts for {category_name}.
 
-For each post, provide:
-1. Post concept (what the image/video shows)
-2. Caption (engaging, parent-friendly, 100-150 characters)
-3. Longer description (200-300 characters with emojis)
-4. Call-to-action
-5. Best posting time
+Context:
+- Category: {category_name}
+- Products: {len(products)} items
+- Key features: {', '.join([f['title'] for f in features[:3]])}
+- Parent concerns: {', '.join([q.get('question', '') for q in parent_questions[:2]])}
 
-Make them visually appealing, authentic, and relatable to parents."""
+For EACH of the 5 posts, provide:
+1. Concept - What the visual shows (lifestyle photo, flat lay, etc.)
+2. Caption - Engaging text (100-150 chars with emojis)
+3. Hashtags - 5-8 relevant hashtags (array)
+4. Best posting time - e.g., "7-9 AM" or "7-9 PM"
+
+Make posts visually appealing, authentic, parent-friendly, and varied in style.
+
+IMPORTANT: Return ONLY valid JSON:
+{{
+  "posts": [
+    {{
+      "post_number": 1,
+      "concept": "description of visual",
+      "caption": "engaging caption with emojis",
+      "hashtags": ["#hashtag1", "#hashtag2"],
+      "best_time": "7-9 AM"
+    }}
+  ]
+}}"""
 
         try:
             response = self.anthropic.messages.create(
                 model="claude-sonnet-4-5-20250929",
-                max_tokens=2000,
+                max_tokens=3000,
                 temperature=0.8,
                 messages=[{"role": "user", "content": prompt}]
             )
 
-            # Parse response and structure posts
-            posts = []
-            for i in range(5):
-                posts.append({
-                    "post_number": i + 1,
-                    "concept": f"Lifestyle shot showcasing {features[i % len(features)]['title'] if features else 'product quality'}",
-                    "caption": f"✨ {category_name} that parents love! Comfort meets style. #ParentingEssentials",
-                    "description": response.content[0].text[:300] if i == 0 else f"Discover why parents choose our {category_name}. Quality, comfort, and peace of mind. 👶💙",
-                    "cta": "Shop Now" if i % 2 == 0 else "Learn More",
-                    "best_time": "7-9 AM or 7-9 PM" if i % 2 == 0 else "12-2 PM"
-                })
+            import json
+            response_text = response.content[0].text.strip()
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
 
+            post_data = json.loads(response_text)
+            posts = post_data.get("posts", [])
+            logger.info(f"Generated {len(posts)} unique Instagram posts")
             return posts
 
         except Exception as e:
-            logger.error(f"Error generating Instagram posts: {e}")
+            logger.error(f"Error generating Instagram posts: {e}", exc_info=True)
             return self._get_fallback_instagram_posts(category_name)
 
     def _generate_facebook_posts(self, research_data: Dict, content_outputs: Dict) -> List[Dict]:

@@ -199,35 +199,120 @@ class PPCAgent:
         return ad_groups
 
     def _generate_ad_copy(self, ad_groups: List[Dict], research_data: Dict) -> List[Dict]:
-        """Generate ad copy for each ad group."""
+        """Generate ad copy for each ad group using Claude."""
         category_insights = research_data.get("category_insights", {})
         category_name = category_insights.get("category_name", "Products")
+        products = research_data.get("products", [])
         usps = category_insights.get("unique_selling_points", [])
+        price_range = category_insights.get("price_range", {})
 
+        # Generate unique ads for first 2 ad groups using Claude
         ads = []
 
-        for i, ad_group in enumerate(ad_groups):
-            # Create 3 ad variations per ad group
-            for variation in range(1, 4):
+        for i, ad_group in enumerate(ad_groups[:2]):  # Focus on main ad groups
+            prompt = f"""Create 3 unique Google Ads text ad variations for the ad group: {ad_group['ad_group_name']}
+
+Category: {category_name}
+Keywords: {', '.join(ad_group.get('keywords', [])[:5])}
+Products: {len(products)} items available
+Price range: £{price_range.get('min', 0):.2f} - £{price_range.get('max', 0):.2f}
+USPs: {', '.join(usps[:3]) if usps else 'Quality, comfort, value'}
+
+For each ad variation, create:
+- 4 headlines (30 chars each max) - compelling, keyword-rich, actionable
+- 2 descriptions (90 chars each max) - benefit-focused, include USPs
+
+Google Ads best practices:
+- Include keywords in headlines
+- Highlight unique benefits
+- Add clear call-to-action
+- Use numbers/percentages when relevant
+
+Return ONLY valid JSON:
+{{
+  "ads": [
+    {{
+      "variation": 1,
+      "headlines": ["headline1", "headline2", "headline3", "headline4"],
+      "descriptions": ["description1", "description2"]
+    }}
+  ]
+}}"""
+
+            try:
+                response = self.anthropic.messages.create(
+                    model="claude-sonnet-4-5-20250929",
+                    max_tokens=2000,
+                    temperature=0.7,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+
+                import json
+                response_text = response.content[0].text.strip()
+                if response_text.startswith("```"):
+                    response_text = response_text.split("```")[1]
+                    if response_text.startswith("json"):
+                        response_text = response_text[4:]
+                    response_text = response_text.strip()
+
+                ad_data = json.loads(response_text)
+
+                for ad_variation in ad_data.get("ads", []):
+                    ads.append({
+                        "ad_group": ad_group["ad_group_name"],
+                        "ad_variation": ad_variation.get("variation", 1),
+                        "headlines": ad_variation.get("headlines", [])[:4],
+                        "descriptions": ad_variation.get("descriptions", [])[:2],
+                        "path1": category_name[:15].replace(" ", "-"),
+                        "path2": "shop" if i % 2 == 0 else "sale",
+                        "final_url": "/category",
+                        "display_url": f"www.example.com/{category_name.lower().replace(' ', '-')}"
+                    })
+
+                logger.info(f"Generated {len(ad_data.get('ads', []))} unique ads for {ad_group['ad_group_name']}")
+
+            except Exception as e:
+                logger.error(f"Error generating ads for {ad_group['ad_group_name']}: {e}", exc_info=True)
+                # Fallback to template
                 ads.append({
                     "ad_group": ad_group["ad_group_name"],
-                    "ad_variation": variation,
+                    "ad_variation": 1,
                     "headlines": [
                         f"Quality {category_name} | Shop Now",
-                        f"{category_name} Sale | Up to 30% Off",
                         f"Best {category_name} Online",
-                        f"Premium {category_name} | Free Delivery"
-                    ][:3 + variation],  # 3-4 headlines
+                        f"Premium {category_name}",
+                        f"Free Delivery Available"
+                    ],
                     "descriptions": [
                         f"Shop our premium {category_name} collection. Quality guaranteed.",
-                        usps[0] if usps else f"Trusted by thousands of parents. Fast delivery.",
-                        "Free returns. Excellent customer service."
-                    ][:2],
+                        f"Trusted by thousands of parents. Fast delivery."
+                    ],
                     "path1": category_name[:15].replace(" ", "-"),
-                    "path2": "shop" if variation % 2 == 0 else "sale",
+                    "path2": "shop",
                     "final_url": "/category",
                     "display_url": f"www.example.com/{category_name.lower().replace(' ', '-')}"
                 })
+
+        # Add template ads for remaining ad groups
+        for ad_group in ad_groups[2:]:
+            ads.append({
+                "ad_group": ad_group["ad_group_name"],
+                "ad_variation": 1,
+                "headlines": [
+                    f"{category_name} Deals",
+                    f"Shop {category_name} Now",
+                    f"Quality {category_name}",
+                    f"Fast & Free Delivery"
+                ],
+                "descriptions": [
+                    f"Browse our {category_name} collection. Great value.",
+                    "Free returns. Excellent customer service."
+                ],
+                "path1": category_name[:15].replace(" ", "-"),
+                "path2": "deals",
+                "final_url": "/category",
+                "display_url": f"www.example.com/{category_name.lower().replace(' ', '-')}"
+            })
 
         return ads
 
