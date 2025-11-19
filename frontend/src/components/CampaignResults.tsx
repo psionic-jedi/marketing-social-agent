@@ -19,7 +19,7 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results }) => {
     );
   }
 
-  const { research_data, content_outputs } = results.results;
+  const { research_data, content_outputs, social_media_plan, ppc_campaign, crm_plan, analyst_insights } = results.results;
 
   return (
     <div className="campaign-results">
@@ -145,6 +145,178 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results }) => {
                 <span className="meta-label">Description:</span>
                 <code>{content_outputs.meta_tags.meta_description}</code>
               </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Social Media Section */}
+      {social_media_plan && (
+        <section className="results-section">
+          <h3 className="section-title">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M18 2H2V18H18V2Z" stroke="currentColor" strokeWidth="2"/>
+              <path d="M6 7H14M6 10H14M6 13H10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            Social Media Strategy
+          </h3>
+
+          {social_media_plan.tiktok && social_media_plan.tiktok.concepts && (
+            <div className="social-platform">
+              <h5>TikTok Content Ideas</h5>
+              {social_media_plan.tiktok.concepts.slice(0, 3).map((concept: any, idx: number) => (
+                <div key={idx} className="content-card">
+                  <div className="concept-number">Concept {concept.concept_number || idx + 1}</div>
+                  <h6>{concept.hook}</h6>
+                  <p>{concept.content_idea}</p>
+                  <div className="hashtags">
+                    {concept.hashtags?.map((tag: string, tagIdx: number) => (
+                      <span key={tagIdx} className="feature-badge">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {social_media_plan.instagram && social_media_plan.instagram.posts && (
+            <div className="social-platform">
+              <h5>Instagram Posts</h5>
+              {social_media_plan.instagram.posts.slice(0, 3).map((post: any, idx: number) => (
+                <div key={idx} className="content-card">
+                  <p className="post-caption">{post.caption?.substring(0, 150)}...</p>
+                  <div className="hashtags">
+                    {post.hashtags?.slice(0, 5).map((tag: string, tagIdx: number) => (
+                      <span key={tagIdx} className="feature-badge">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* PPC Campaign Section */}
+      {ppc_campaign && ppc_campaign.ads && (
+        <section className="results-section">
+          <h3 className="section-title">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M4 6H16M4 10H16M4 14H10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            Google Ads Campaign
+          </h3>
+
+          <div className="ads-list">
+            {ppc_campaign.ads.slice(0, 3).map((ad: any, idx: number) => (
+              <div key={idx} className="content-card">
+                <div className="ad-group-badge">{ad.ad_group}</div>
+                <div className="ad-headlines">
+                  {ad.headlines?.slice(0, 2).map((headline: string, hIdx: number) => (
+                    <h6 key={hIdx} className="ad-headline">{headline}</h6>
+                  ))}
+                </div>
+                <p className="ad-description">{ad.descriptions?.[0]}</p>
+                <div className="ad-url">
+                  <span className="meta-label">Display URL:</span>
+                  <code>{ad.display_url}</code>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* CRM/Email Section */}
+      {crm_plan && (
+        <section className="results-section">
+          <h3 className="section-title">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M2 4L10 10L18 4M2 4V16H18V4H2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Email Marketing & CRM Strategy
+          </h3>
+
+          {crm_plan.welcome_series && (
+            <div className="email-campaign-section">
+              <h5>Welcome Email Series</h5>
+              <div className="email-list">
+                {crm_plan.welcome_series.slice(0, 3).map((email: any, idx: number) => (
+                  <div key={idx} className="content-card">
+                    <div className="email-type-badge">Email {idx + 1}</div>
+                    <h6>{email.subject}</h6>
+                    <p className="email-preview">{email.preview_text}</p>
+                    {email.mjml_template && (
+                      <div className="email-meta">
+                        <span className="stat-label">MJML Template Available</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {crm_plan.cart_abandonment && (
+            <div className="email-campaign-section">
+              <h5>Cart Abandonment Email</h5>
+              <div className="content-card">
+                <h6>{crm_plan.cart_abandonment.subject}</h6>
+                <p className="email-preview">{crm_plan.cart_abandonment.preview_text}</p>
+              </div>
+            </div>
+          )}
+
+          {crm_plan.segmentation_strategy && (
+            <div className="strategy-card">
+              <h5>Segmentation Strategy</h5>
+              {crm_plan.segmentation_strategy.segments && crm_plan.segmentation_strategy.segments.slice(0, 3).map((segment: any, idx: number) => (
+                <div key={idx} className="meta-item">
+                  <span className="meta-label">{segment.name}:</span>
+                  <code>{segment.criteria}</code>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Analyst Insights Section */}
+      {analyst_insights && (
+        <section className="results-section">
+          <h3 className="section-title">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M3 17V3H17V17H3Z" stroke="currentColor" strokeWidth="2"/>
+              <path d="M7 13L10 9L13 11L17 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Performance Insights & Recommendations
+          </h3>
+
+          {analyst_insights.timeline && (
+            <div className="timeline-grid">
+              {Object.entries(analyst_insights.timeline).slice(0, 3).map(([key, phase]: [string, any], idx: number) => (
+                <div key={idx} className="content-card">
+                  <h6>{key.replace(/_/g, ' ').toUpperCase()}</h6>
+                  <p className="phase-duration">{phase.duration}</p>
+                  <ul className="activity-list">
+                    {phase.activities?.slice(0, 3).map((activity: string, aIdx: number) => (
+                      <li key={aIdx}>{activity}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {analyst_insights.success_metrics && (
+            <div className="metrics-card">
+              <h5>Success Metrics</h5>
+              {Object.entries(analyst_insights.success_metrics).map(([metric, target]: [string, any], idx: number) => (
+                <div key={idx} className="meta-item">
+                  <span className="meta-label">{metric.replace(/_/g, ' ')}:</span>
+                  <code>{JSON.stringify(target)}</code>
+                </div>
+              ))}
             </div>
           )}
         </section>

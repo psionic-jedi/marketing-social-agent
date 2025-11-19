@@ -124,7 +124,15 @@ Create:
 2. A subheadline (10-15 words) that addresses a parent's concern or desire
 3. A clear call-to-action button text (2-4 words)
 
-Make it emotional, benefit-focused, and parent-friendly."""
+Make it emotional, benefit-focused, and parent-friendly.
+
+IMPORTANT: Return ONLY valid JSON in this exact format:
+{{
+  "headline": "Your compelling headline here",
+  "subheadline": "Your subheadline here",
+  "cta_text": "Shop Now",
+  "cta_url": "/category"
+}}"""
 
         try:
             response = self.anthropic.messages.create(
@@ -134,20 +142,27 @@ Make it emotional, benefit-focused, and parent-friendly."""
                 messages=[{"role": "user", "content": prompt}]
             )
 
-            # For demo, return structured content
+            # Parse Claude's JSON response
+            import json
+            response_text = response.content[0].text.strip()
+
+            # Remove markdown code blocks if present
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            hero_data = json.loads(response_text)
+            logger.info(f"Generated hero section: {hero_data.get('headline', '')}")
+            return hero_data
+
+        except Exception as e:
+            logger.error(f"Error generating hero section: {e}", exc_info=True)
             return {
                 "headline": f"Discover Quality {category_name}",
                 "subheadline": "Comfortable, durable, and designed with your child in mind",
                 "cta_text": "Shop Now",
-                "cta_url": "/category"
-            }
-
-        except Exception as e:
-            logger.error(f"Error generating hero section: {e}")
-            return {
-                "headline": f"{category_name}",
-                "subheadline": "Quality products for your family",
-                "cta_text": "Browse Collection",
                 "cta_url": "/category"
             }
 
@@ -162,27 +177,73 @@ Make it emotional, benefit-focused, and parent-friendly."""
             List of feature dictionaries
         """
         common_features = research_data.get("category_insights", {}).get("common_features", [])
+        category_name = research_data.get("category_insights", {}).get("category_name", "Products")
 
-        # For demo, return sample features
-        features = [
-            {
-                "title": "Premium Quality Materials",
-                "description": "Made from the finest fabrics that are soft, durable, and safe for sensitive skin",
-                "icon": "quality"
-            },
-            {
-                "title": "Designed for Comfort",
-                "description": "Every piece is crafted with your child's comfort in mind, perfect for all-day wear",
-                "icon": "comfort"
-            },
-            {
-                "title": "Easy Care & Maintenance",
-                "description": "Machine washable and designed to last through countless washes and wear",
-                "icon": "care"
-            }
-        ]
+        prompt = f"""Create 3 compelling feature callouts for a {category_name} category page.
 
-        return features[:3]
+Common Features Found:
+{', '.join(common_features[:5])}
+
+For each feature:
+1. Create a benefit-focused title (3-5 words)
+2. Write a description that addresses parent concerns (15-20 words)
+3. Assign an icon type: "quality", "comfort", or "care"
+
+IMPORTANT: Return ONLY valid JSON in this exact format:
+{{
+  "features": [
+    {{
+      "title": "Feature Title",
+      "description": "Benefit-focused description",
+      "icon": "quality"
+    }}
+  ]
+}}"""
+
+        try:
+            response = self.anthropic.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=800,
+                temperature=0.7,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            # Parse Claude's JSON response
+            import json
+            response_text = response.content[0].text.strip()
+
+            # Remove markdown code blocks if present
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            data = json.loads(response_text)
+            features = data.get("features", [])
+            logger.info(f"Generated {len(features)} feature callouts")
+            return features[:3]
+
+        except Exception as e:
+            logger.error(f"Error generating features: {e}", exc_info=True)
+            # Fallback to default features
+            return [
+                {
+                    "title": "Premium Quality Materials",
+                    "description": "Made from the finest fabrics that are soft, durable, and safe for sensitive skin",
+                    "icon": "quality"
+                },
+                {
+                    "title": "Designed for Comfort",
+                    "description": "Every piece is crafted with your child's comfort in mind, perfect for all-day wear",
+                    "icon": "comfort"
+                },
+                {
+                    "title": "Easy Care & Maintenance",
+                    "description": "Machine washable and designed to last through countless washes and wear",
+                    "icon": "care"
+                }
+            ]
 
     def _generate_category_description(self, research_data: Dict) -> str:
         """

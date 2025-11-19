@@ -58,7 +58,7 @@ class CampaignService:
                     db.commit()
                     logger.info(f"Campaign {campaign_id} progress: {current_step} ({progress}%)")
                 except Exception as e:
-                    logger.error(f"Failed to update progress: {e}")
+                    logger.error(f"Failed to update progress: {e}", exc_info=True)
 
             # Create overlord with progress callback
             overlord = OverlordAgent(progress_callback=update_progress)
@@ -71,9 +71,15 @@ class CampaignService:
                 launch_date=campaign.launch_date.isoformat() if campaign.launch_date else None
             )
 
-            # Execute workflow
-            logger.info(f"Executing Overlord workflow for campaign {campaign_id}")
-            final_state = await overlord.execute_async(initial_state)
+            # Execute workflow asynchronously using Playwright's async API
+            logger.info(f"Executing Overlord workflow for campaign {campaign_id} asynchronously")
+
+            try:
+                final_state = await overlord.execute(initial_state)
+                logger.info(f"Workflow execution completed for campaign {campaign_id}")
+            except Exception as exec_error:
+                logger.error(f"Workflow execution failed for campaign {campaign_id}: {exec_error}", exc_info=True)
+                raise
 
             # Save results to database
             await self._save_results(campaign_id, final_state, db)

@@ -75,7 +75,7 @@ class OverlordAgent:
         # Compile the workflow
         return workflow.compile()
 
-    def _run_research_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
+    async def _run_research_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
         Run the Research Agent.
 
@@ -92,7 +92,7 @@ class OverlordAgent:
             self.progress_callback(state['campaign_id'], 'research', 16.67)
 
         try:
-            state = self.research_agent.execute(state)
+            state = await self.research_agent.execute(state)
         except Exception as e:
             error_msg = f"Research Agent execution failed: {str(e)}"
             logger.error(error_msg, exc_info=True)
@@ -100,7 +100,7 @@ class OverlordAgent:
 
         return state
 
-    def _run_content_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
+    async def _run_content_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
         Run the Content Agent.
 
@@ -125,7 +125,7 @@ class OverlordAgent:
 
         return state
 
-    def _run_social_media_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
+    async def _run_social_media_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
         Run the Social Media Agent.
 
@@ -150,7 +150,7 @@ class OverlordAgent:
 
         return state
 
-    def _run_ppc_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
+    async def _run_ppc_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
         Run the PPC Agent.
 
@@ -175,7 +175,7 @@ class OverlordAgent:
 
         return state
 
-    def _run_crm_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
+    async def _run_crm_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
         Run the CRM Agent.
 
@@ -200,7 +200,7 @@ class OverlordAgent:
 
         return state
 
-    def _run_analyst_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
+    async def _run_analyst_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
         Run the Analyst Agent.
 
@@ -225,7 +225,7 @@ class OverlordAgent:
 
         return state
 
-    def _finalize_campaign(self, state: MarketingCampaignState) -> MarketingCampaignState:
+    async def _finalize_campaign(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
         Finalize the campaign by consolidating all outputs.
 
@@ -273,9 +273,9 @@ class OverlordAgent:
 
         return state
 
-    def execute(self, state: MarketingCampaignState) -> MarketingCampaignState:
+    async def execute(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
-        Execute the entire campaign workflow.
+        Execute the entire campaign workflow asynchronously.
 
         Args:
             state: Initial campaign state
@@ -286,9 +286,29 @@ class OverlordAgent:
         logger.info(f"Overlord: Starting workflow for campaign {state['campaign_id']}")
 
         try:
-            # Run the workflow
-            final_state = self.workflow.invoke(state)
-            return final_state
+            # Run agents sequentially (for now, bypassing LangGraph for async support)
+            # Step 1: Research
+            state = await self._run_research_agent(state)
+
+            # Step 2: Content
+            state = await self._run_content_agent(state)
+
+            # Step 3: Social Media
+            state = await self._run_social_media_agent(state)
+
+            # Step 4: PPC
+            state = await self._run_ppc_agent(state)
+
+            # Step 5: CRM
+            state = await self._run_crm_agent(state)
+
+            # Step 6: Analyst
+            state = await self._run_analyst_agent(state)
+
+            # Finalize
+            state = await self._finalize_campaign(state)
+
+            return state
 
         except Exception as e:
             error_msg = f"Workflow execution failed: {str(e)}"
@@ -298,17 +318,3 @@ class OverlordAgent:
             state["progress_percentage"] = 100
             state["completed_at"] = datetime.utcnow().isoformat()
             return state
-
-    async def execute_async(self, state: MarketingCampaignState) -> MarketingCampaignState:
-        """
-        Execute the workflow asynchronously (for background tasks).
-
-        Args:
-            state: Initial campaign state
-
-        Returns:
-            Final state with all outputs
-        """
-        # For now, just call the sync version
-        # In a production system, we'd use LangGraph's async support
-        return self.execute(state)

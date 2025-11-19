@@ -10,7 +10,7 @@ Responsibilities:
 """
 import logging
 from typing import Dict, List
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 from bs4 import BeautifulSoup
 from anthropic import Anthropic
 
@@ -31,7 +31,7 @@ class ResearchAgent:
         else:
             self.use_mock_data = use_mock_data
 
-    def execute(self, state: MarketingCampaignState) -> MarketingCampaignState:
+    async def execute(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
         Execute the research agent workflow.
 
@@ -56,7 +56,7 @@ class ResearchAgent:
                 # Step 1: Scrape category page (with 60s timeout)
                 logger.info(f"Scraping category page: {state['category_url']}")
                 try:
-                    html_content = self._scrape_page(state["category_url"])
+                    html_content = await self._scrape_page(state["category_url"])
                 except Exception as scrape_error:
                     logger.warning(f"Scraping failed, falling back to mock data: {scrape_error}")
                     products = self._get_mock_products()
@@ -107,9 +107,9 @@ class ResearchAgent:
             state["progress_percentage"] = 30  # Still advance progress
             return state
 
-    def _scrape_page(self, url: str, timeout: int = 60000) -> str:
+    async def _scrape_page(self, url: str, timeout: int = 60000) -> str:
         """
-        Scrape a web page using Playwright.
+        Scrape a web page using Playwright (async).
 
         Args:
             url: URL to scrape
@@ -122,9 +122,12 @@ class ResearchAgent:
         page = None
 
         try:
-            with sync_playwright() as p:
+            logger.info(f"[SCRAPER] Starting Playwright for {url}")
+            async with async_playwright() as p:
+                logger.info(f"[SCRAPER] Playwright context created")
                 # Launch browser with anti-detection settings
-                browser = p.chromium.launch(
+                logger.info(f"[SCRAPER] Launching Chromium browser...")
+                browser = await p.chromium.launch(
                     headless=True,
                     args=[
                         '--disable-blink-features=AutomationControlled',
@@ -132,64 +135,79 @@ class ResearchAgent:
                         '--no-sandbox'
                     ]
                 )
+                logger.info(f"[SCRAPER] Browser launched successfully")
 
                 # Create context with realistic browser settings
-                context = browser.new_context(
+                logger.info(f"[SCRAPER] Creating browser context...")
+                context = await browser.new_context(
                     viewport={'width': 1920, 'height': 1080},
                     user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                 )
 
-                page = context.new_page()
+                page = await context.new_page()
+                logger.info(f"[SCRAPER] New page created")
 
                 # Set default navigation timeout
                 page.set_default_navigation_timeout(timeout)
                 page.set_default_timeout(timeout)
+                logger.info(f"[SCRAPER] Timeouts set to {timeout}ms")
 
                 # Navigate to URL with lenient wait condition
-                logger.info(f"Navigating to {url} with {timeout}ms timeout")
-                page.goto(url, wait_until="domcontentloaded")
+                logger.info(f"[SCRAPER] Navigating to {url} with {timeout}ms timeout")
+                await page.goto(url, wait_until="domcontentloaded")
+                logger.info(f"[SCRAPER] Page loaded (domcontentloaded)")
 
                 # Wait for dynamic content to load
-                page.wait_for_timeout(3000)
+                logger.info(f"[SCRAPER] Waiting 3s for dynamic content...")
+                await page.wait_for_timeout(3000)
+                logger.info(f"[SCRAPER] Dynamic content wait complete")
 
                 # Get page content
-                html_content = page.content()
-                logger.info(f"Successfully scraped {url} ({len(html_content)} bytes)")
+                logger.info(f"[SCRAPER] Extracting page content...")
+                html_content = await page.content()
+                logger.info(f"[SCRAPER] Successfully scraped {url} ({len(html_content)} bytes)")
 
-                browser.close()
+                await browser.close()
+                logger.info(f"[SCRAPER] Browser closed")
                 return html_content
 
         except PlaywrightTimeoutError as e:
-            logger.warning(f"Timeout scraping {url} after {timeout}ms: {e}")
+            logger.error(f"[SCRAPER] TIMEOUT scraping {url} after {timeout}ms: {e}", exc_info=True)
             # Try to get whatever content was loaded
             try:
                 if page:
-                    content = page.content()
+                    logger.info(f"[SCRAPER] Attempting to get partial content...")
+                    content = await page.content()
                     if browser:
-                        browser.close()
+                        await browser.close()
+                        logger.info(f"[SCRAPER] Browser closed after timeout")
                     if content and len(content) > 1000:
-                        logger.info(f"Returning partial content ({len(content)} bytes)")
+                        logger.info(f"[SCRAPER] Returning partial content ({len(content)} bytes)")
                         return content
+                    else:
+                        logger.warning(f"[SCRAPER] Partial content too small: {len(content) if content else 0} bytes")
             except Exception as partial_error:
-                logger.error(f"Could not get partial content: {partial_error}")
+                logger.error(f"[SCRAPER] Could not get partial content: {partial_error}", exc_info=True)
 
             # Clean up
             if browser:
                 try:
-                    browser.close()
-                except:
-                    pass
+                    await browser.close()
+                    logger.info(f"[SCRAPER] Browser cleanup complete")
+                except Exception as cleanup_error:
+                    logger.error(f"[SCRAPER] Cleanup failed: {cleanup_error}")
 
             raise  # Re-raise to trigger fallback to mock data
 
         except Exception as e:
-            logger.error(f"Error scraping {url}: {e}", exc_info=True)
+            logger.error(f"[SCRAPER] FATAL ERROR scraping {url}: {type(e).__name__}: {e}", exc_info=True)
             # Close browser if it exists
             if browser:
                 try:
-                    browser.close()
-                except:
-                    pass
+                    await browser.close()
+                    logger.info(f"[SCRAPER] Browser closed after error")
+                except Exception as cleanup_error:
+                    logger.error(f"[SCRAPER] Cleanup failed: {cleanup_error}")
             raise  # Re-raise to trigger fallback to mock data
 
     def _parse_products(self, html_content: str, url: str) -> List[Dict]:
@@ -210,50 +228,67 @@ class ResearchAgent:
 
 URL: {url}
 
-Extract as many products as you can find, including:
+Extract as many products as you can find (aim for 8-15 products), including:
 - Product name
-- Price (if available)
-- Brief description
+- Price (if available, convert to numeric format)
+- Brief description (if available)
 - Any key features mentioned
 
-HTML content (truncated to first 5000 chars):
-{html_content[:5000]}
+HTML content (first 10000 chars):
+{html_content[:10000]}
 
-Return a JSON array of products with fields: name, price, description, features.
-If you can't find specific products, return an empty array and explain what you found instead."""
+IMPORTANT: Return ONLY valid JSON, no other text. Format:
+{{
+  "products": [
+    {{
+      "name": "Product Name",
+      "price": 12.99,
+      "description": "Brief description",
+      "features": ["feature1", "feature2"]
+    }}
+  ]
+}}
+
+If you can't find specific products, return {{"products": [], "explanation": "reason"}}"""
 
         try:
             response = self.anthropic.messages.create(
                 model="claude-sonnet-4-5-20250929",
-                max_tokens=2000,
+                max_tokens=4000,
                 temperature=0.3,
                 messages=[{"role": "user", "content": prompt}]
             )
 
-            # Parse Claude's response
-            # In a real implementation, we'd use structured output
-            # For now, we'll create sample data
-            logger.info(f"Claude analyzed page: {response.content[0].text[:200]}...")
+            # Parse Claude's JSON response
+            import json
+            response_text = response.content[0].text.strip()
 
-            # Return sample product data for demo
-            return [
-                {
-                    "name": "Sample Product 1",
-                    "price": 12.99,
-                    "description": "Comfortable children's clothing item",
-                    "features": ["Organic cotton", "Machine washable"]
-                },
-                {
-                    "name": "Sample Product 2",
-                    "price": 15.99,
-                    "description": "High-quality children's wear",
-                    "features": ["Durable", "Soft fabric"]
-                }
-            ]
+            # Remove markdown code blocks if present
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
 
+            data = json.loads(response_text)
+            products = data.get("products", [])
+
+            if products:
+                logger.info(f"Successfully parsed {len(products)} products from {url}")
+                return products
+            else:
+                explanation = data.get("explanation", "No explanation provided")
+                logger.warning(f"No products found: {explanation}")
+                # Fall back to mock data if no products found
+                return self._get_mock_products()
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON from Claude response: {e}")
+            logger.debug(f"Response was: {response_text[:500]}")
+            return self._get_mock_products()
         except Exception as e:
-            logger.error(f"Error parsing products: {e}")
-            return []
+            logger.error(f"Error parsing products: {e}", exc_info=True)
+            return self._get_mock_products()
 
     def _analyze_category(self, products: List[Dict], html_content: str) -> Dict:
         """

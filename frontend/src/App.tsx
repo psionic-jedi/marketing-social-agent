@@ -26,7 +26,15 @@ function App() {
   const loadCampaigns = async () => {
     try {
       const data = await campaignService.getCampaigns();
-      setCampaigns(data);
+      // Sort campaigns: completed first, then by creation date (newest first)
+      const sorted = data.sort((a, b) => {
+        // Prioritize completed campaigns
+        if (a.status === 'completed' && b.status !== 'completed') return -1;
+        if (a.status !== 'completed' && b.status === 'completed') return 1;
+        // Then sort by creation date (newest first)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      setCampaigns(sorted);
     } catch (error) {
       console.error('Failed to load campaigns:', error);
     }
@@ -106,7 +114,7 @@ function App() {
             {campaigns.length > 0 && (
               <div className="campaign-list">
                 <h3>Recent Campaigns</h3>
-                {campaigns.slice(0, 5).map((campaign) => (
+                {campaigns.slice(0, 10).map((campaign: Campaign) => (
                   <button
                     key={campaign.id}
                     className={`campaign-item ${selectedCampaign === campaign.id ? 'active' : ''}`}
