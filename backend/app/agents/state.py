@@ -44,12 +44,13 @@ class MarketingCampaignState(TypedDict):
     generated_images: Annotated[List[str], operator.add]  # URLs to generated images
     # Will accumulate images as they're generated
 
-    # Marketing Channels (Phase 2 - not implemented yet)
+    # Marketing Channels
     social_media_plan: Optional[Dict]
-    ppc_campaign: Optional[Dict]
+    ppc_campaign: Optional[Dict]  # Google Ads
+    meta_ads_campaign: Optional[Dict]  # Facebook/Instagram Ads
     crm_plan: Optional[Dict]
 
-    # Post-Launch (Phase 4 - not implemented yet)
+    # Analysis
     analyst_insights: Optional[Dict]
 
     # System metadata
@@ -91,6 +92,7 @@ def create_initial_state(
         generated_images=[],
         social_media_plan=None,
         ppc_campaign=None,
+        meta_ads_campaign=None,
         crm_plan=None,
         analyst_insights=None,
         current_step="initializing",

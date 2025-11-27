@@ -14,6 +14,7 @@ from app.agents.research_agent import ResearchAgent
 from app.agents.content_agent import ContentAgent
 from app.agents.social_media_agent import SocialMediaAgent
 from app.agents.ppc_agent import PPCAgent
+from app.agents.meta_ads_agent import MetaAdsAgent
 from app.agents.crm_agent import CRMAgent
 from app.agents.analyst_agent import AnalystAgent
 
@@ -29,6 +30,7 @@ class OverlordAgent:
     - Content Agent: Marketing copy and image generation
     - Social Media Agent: Social media strategy and content
     - PPC Agent: Google Ads campaigns
+    - Meta Ads Agent: Facebook and Instagram campaigns
     - CRM Agent: Email marketing campaigns with MJML
     - Analyst Agent: Performance analysis and recommendations
     """
@@ -38,6 +40,7 @@ class OverlordAgent:
         self.content_agent = ContentAgent()
         self.social_media_agent = SocialMediaAgent()
         self.ppc_agent = PPCAgent()
+        self.meta_ads_agent = MetaAdsAgent()
         self.crm_agent = CRMAgent()
         self.analyst_agent = AnalystAgent()
         self.progress_callback = progress_callback
@@ -58,6 +61,7 @@ class OverlordAgent:
         workflow.add_node("content", self._run_content_agent)
         workflow.add_node("social_media", self._run_social_media_agent)
         workflow.add_node("ppc", self._run_ppc_agent)
+        workflow.add_node("meta_ads", self._run_meta_ads_agent)
         workflow.add_node("crm", self._run_crm_agent)
         workflow.add_node("analyst", self._run_analyst_agent)
         workflow.add_node("finalize", self._finalize_campaign)
@@ -67,7 +71,8 @@ class OverlordAgent:
         workflow.add_edge("research", "content")
         workflow.add_edge("content", "social_media")
         workflow.add_edge("social_media", "ppc")
-        workflow.add_edge("ppc", "crm")
+        workflow.add_edge("ppc", "meta_ads")
+        workflow.add_edge("meta_ads", "crm")
         workflow.add_edge("crm", "analyst")
         workflow.add_edge("analyst", "finalize")
         workflow.add_edge("finalize", END)
@@ -164,12 +169,37 @@ class OverlordAgent:
 
         # Update progress: Starting PPC campaign creation
         if self.progress_callback:
-            self.progress_callback(state['campaign_id'], 'ppc', 66.67)
+            self.progress_callback(state['campaign_id'], 'ppc', 60.0)
 
         try:
             state = self.ppc_agent.execute(state)
         except Exception as e:
             error_msg = f"PPC Agent execution failed: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            state["errors"].append(error_msg)
+
+        return state
+
+    async def _run_meta_ads_agent(self, state: MarketingCampaignState) -> MarketingCampaignState:
+        """
+        Run the Meta Ads Agent.
+
+        Args:
+            state: Current campaign state
+
+        Returns:
+            Updated state with Meta Ads campaign
+        """
+        logger.info(f"Overlord: Executing Meta Ads Agent for campaign {state['campaign_id']}")
+
+        # Update progress: Starting Meta Ads campaign creation
+        if self.progress_callback:
+            self.progress_callback(state['campaign_id'], 'meta_ads', 70.0)
+
+        try:
+            state = self.meta_ads_agent.execute(state)
+        except Exception as e:
+            error_msg = f"Meta Ads Agent execution failed: {str(e)}"
             logger.error(error_msg, exc_info=True)
             state["errors"].append(error_msg)
 
@@ -254,6 +284,7 @@ class OverlordAgent:
             "images": state.get("generated_images", []),
             "social_media": state.get("social_media_plan"),
             "ppc": state.get("ppc_campaign"),
+            "meta_ads": state.get("meta_ads_campaign"),
             "crm": state.get("crm_plan"),
             "analyst": state.get("analyst_insights"),
             "execution_summary": {
@@ -296,13 +327,16 @@ class OverlordAgent:
             # Step 3: Social Media
             state = await self._run_social_media_agent(state)
 
-            # Step 4: PPC
+            # Step 4: PPC (Google Ads)
             state = await self._run_ppc_agent(state)
 
-            # Step 5: CRM
+            # Step 5: Meta Ads (Facebook/Instagram)
+            state = await self._run_meta_ads_agent(state)
+
+            # Step 6: CRM
             state = await self._run_crm_agent(state)
 
-            # Step 6: Analyst
+            # Step 7: Analyst
             state = await self._run_analyst_agent(state)
 
             # Finalize

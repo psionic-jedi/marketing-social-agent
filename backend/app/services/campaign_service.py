@@ -143,6 +143,7 @@ class CampaignService:
         result.content_outputs = final_state.get("content_outputs")
         result.social_media_plan = final_state.get("social_media_plan")
         result.ppc_campaign = final_state.get("ppc_campaign")
+        result.meta_ads_campaign = final_state.get("meta_ads_campaign")
         result.crm_plan = final_state.get("crm_plan")
         result.analyst_insights = final_state.get("analyst_insights")
 

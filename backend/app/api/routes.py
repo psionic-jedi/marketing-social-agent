@@ -171,6 +171,7 @@ async def get_campaign_results(
             "content_outputs": results.content_outputs,
             "social_media_plan": results.social_media_plan,
             "ppc_campaign": results.ppc_campaign,
+            "meta_ads_campaign": results.meta_ads_campaign,
             "crm_plan": results.crm_plan,
             "analyst_insights": results.analyst_insights
         }

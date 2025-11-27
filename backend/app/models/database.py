@@ -112,6 +112,7 @@ class CampaignResult(Base):
     content_outputs = Column(JSONB)
     social_media_plan = Column(JSONB)
     ppc_campaign = Column(JSONB)
+    meta_ads_campaign = Column(JSONB)
     crm_plan = Column(JSONB)
     analyst_insights = Column(JSONB)
 

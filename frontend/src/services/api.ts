@@ -43,6 +43,7 @@ export interface CampaignResults {
     content_outputs?: any;
     social_media_plan?: any;
     ppc_campaign?: any;
+    meta_ads_campaign?: any;
     crm_plan?: any;
     analyst_insights?: any;
   } | null;

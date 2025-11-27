@@ -26,7 +26,7 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
     );
   }
 
-  const { research_data, content_outputs, social_media_plan, ppc_campaign, crm_plan, analyst_insights } = results.results;
+  const { research_data, content_outputs, social_media_plan, ppc_campaign, meta_ads_campaign, crm_plan, analyst_insights } = results.results;
 
   return (
     <div className="campaign-results">
@@ -259,6 +259,191 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* Meta Ads Section */}
+      {meta_ads_campaign && (
+        <section className="results-section">
+          <h3 className="section-title">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M18 2H2V18H18V2Z" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="7" cy="7" r="2" fill="currentColor"/>
+              <path d="M10 13L13 8L17 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Meta Ads (Facebook & Instagram)
+          </h3>
+
+          {/* Campaign Structure */}
+          {meta_ads_campaign.campaign_structure && (
+            <div className="insight-card">
+              <h4>{meta_ads_campaign.campaign_structure.campaign_name}</h4>
+              <div className="stat-grid">
+                <div className="stat-item">
+                  <span className="stat-label">Primary Objective</span>
+                  <span className="stat-value" style={{textTransform: 'capitalize'}}>{meta_ads_campaign.campaign_structure.primary_objective}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Optimization</span>
+                  <span className="stat-value">{meta_ads_campaign.campaign_structure.optimization_goal}</span>
+                </div>
+              </div>
+              {meta_ads_campaign.campaign_structure.recommended_campaign_types && (
+                <div className="campaign-types">
+                  <h5 style={{marginTop: '1rem', marginBottom: '0.5rem'}}>Recommended Campaign Types</h5>
+                  {meta_ads_campaign.campaign_structure.recommended_campaign_types.map((campaign: any, idx: number) => (
+                    <div key={idx} className="meta-item">
+                      <span className="meta-label">{campaign.type} ({campaign.recommended_budget_split}):</span>
+                      <code>{campaign.description}</code>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Audiences */}
+          {meta_ads_campaign.audiences && (
+            <div className="audiences-section">
+              <h5>Target Audiences</h5>
+
+              {meta_ads_campaign.audiences.core_audiences && meta_ads_campaign.audiences.core_audiences.length > 0 && (
+                <div className="audience-group">
+                  <h6 style={{color: '#4CAF50', marginBottom: '0.5rem'}}>Core Audiences</h6>
+                  {meta_ads_campaign.audiences.core_audiences.slice(0, 3).map((audience: any, idx: number) => (
+                    <div key={idx} className="content-card">
+                      <div className="ad-group-badge">{audience.priority} Priority</div>
+                      <h6>{audience.name}</h6>
+                      <div className="audience-details">
+                        <span className="stat-label">Age Range:</span> {audience.targeting?.age_range || 'All'}<br/>
+                        <span className="stat-label">Interests:</span> {audience.targeting?.interests?.slice(0, 4).join(', ')}
+                      </div>
+                      <div className="stat-item" style={{marginTop: '0.5rem'}}>
+                        <span className="stat-label">Est. Reach:</span>
+                        <span className="stat-value">{audience.estimated_reach}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {meta_ads_campaign.audiences.lookalike_audiences && meta_ads_campaign.audiences.lookalike_audiences.length > 0 && (
+                <div className="audience-group" style={{marginTop: '1rem'}}>
+                  <h6 style={{color: '#2196F3', marginBottom: '0.5rem'}}>Lookalike Audiences</h6>
+                  {meta_ads_campaign.audiences.lookalike_audiences.slice(0, 2).map((audience: any, idx: number) => (
+                    <div key={idx} className="content-card">
+                      <h6>{audience.name}</h6>
+                      <p className="email-preview">{audience.description}</p>
+                      <div className="hashtags">
+                        <span className="feature-badge">{audience.percentage} - {audience.country}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Ad Sets */}
+          {meta_ads_campaign.ad_sets && meta_ads_campaign.ad_sets.length > 0 && (
+            <div className="ad-sets-section">
+              <h5>Ad Sets ({meta_ads_campaign.ad_sets.length})</h5>
+              {meta_ads_campaign.ad_sets.slice(0, 4).map((adSet: any, idx: number) => (
+                <div key={idx} className="content-card">
+                  <div className="ad-group-badge">{adSet.campaign_type}</div>
+                  <h6>{adSet.name}</h6>
+                  <div className="stat-grid" style={{marginTop: '0.5rem'}}>
+                    <div className="stat-item">
+                      <span className="stat-label">Daily Budget</span>
+                      <span className="stat-value">{adSet.recommended_daily_budget}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Optimization</span>
+                      <span className="stat-value">{adSet.optimization}</span>
+                    </div>
+                  </div>
+                  <div className="hashtags" style={{marginTop: '0.5rem'}}>
+                    {adSet.placements?.positions?.map((placement: string, pIdx: number) => (
+                      <span key={pIdx} className="feature-badge">{placement}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Ad Copy */}
+          {meta_ads_campaign.ad_copy && meta_ads_campaign.ad_copy.variations && (
+            <div className="ad-copy-section">
+              <h5>Ad Copy Variations</h5>
+              {meta_ads_campaign.ad_copy.variations.map((variation: any, idx: number) => (
+                <div key={idx} className="content-card">
+                  <div className="ad-group-badge" style={{textTransform: 'capitalize'}}>{variation.tone}</div>
+                  <h6 style={{color: '#1877F2'}}>{variation.headline}</h6>
+                  <p className="post-caption">{variation.primary_text}</p>
+                  <div className="ad-url">
+                    <span className="meta-label">Description:</span>
+                    <code>{variation.description}</code>
+                  </div>
+                  <div className="hashtags">
+                    <span className="feature-badge">CTA: {variation.cta_button}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Creative Recommendations */}
+          {meta_ads_campaign.ad_creatives && meta_ads_campaign.ad_creatives.length > 0 && (
+            <div className="creatives-section">
+              <h5>Creative Formats</h5>
+              <div className="creatives-grid">
+                {meta_ads_campaign.ad_creatives.map((creative: any, idx: number) => (
+                  <div key={idx} className="content-card">
+                    <div className="ad-group-badge">{creative.format}</div>
+                    <h6>{creative.name}</h6>
+                    <div className="meta-item">
+                      <span className="meta-label">Specs:</span>
+                      <code>{creative.specs?.aspect_ratio || creative.specs?.resolution}</code>
+                    </div>
+                    <div className="hashtags">
+                      {creative.placement_optimized?.map((placement: string, pIdx: number) => (
+                        <span key={pIdx} className="feature-badge">{placement}</span>
+                      ))}
+                    </div>
+                    <p className="email-preview" style={{marginTop: '0.5rem'}}>{creative.recommended_for}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Budget Allocation */}
+          {meta_ads_campaign.budget_allocation && (
+            <div className="strategy-card">
+              <h5>Budget Allocation</h5>
+              <div className="stat-grid">
+                <div className="stat-item">
+                  <span className="stat-label">Total Monthly</span>
+                  <span className="stat-value">{meta_ads_campaign.budget_allocation.total_monthly_budget}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Daily Budget</span>
+                  <span className="stat-value">{meta_ads_campaign.budget_allocation.daily_budget_recommendation}</span>
+                </div>
+              </div>
+              {meta_ads_campaign.budget_allocation.recommended_split && (
+                <div style={{marginTop: '1rem'}}>
+                  {Object.entries(meta_ads_campaign.budget_allocation.recommended_split).map(([key, value]: [string, any], idx: number) => (
+                    <div key={idx} className="meta-item">
+                      <span className="meta-label" style={{textTransform: 'capitalize'}}>{key} ({value.percentage}):</span>
+                      <code>{value.amount} - {value.focus}</code>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       )}
 
