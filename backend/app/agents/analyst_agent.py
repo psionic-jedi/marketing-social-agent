@@ -41,7 +41,7 @@ class AnalystAgent:
         state["progress_percentage"] = 95
 
         try:
-            budget = state.get("budget", 5000)
+            budget = state.get("budget") or 5000
             research_data = state.get("research_data")
             ppc_campaign = state.get("ppc_campaign")
             social_media_plan = state.get("social_media_plan")

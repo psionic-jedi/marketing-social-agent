@@ -62,11 +62,37 @@ class ResearchAgent:
                     products = self._get_mock_products()
                     category_insights = self._get_mock_insights()
                 else:
-                    # Step 2: Parse product data
-                    logger.info("Parsing product data")
+                    # Step 2: Parse product data from listing page
+                    logger.info("Parsing product data from listing page")
                     products = self._parse_products(html_content, state["category_url"])
 
-                    # Step 3: Analyze with Claude to extract insights
+                    # Step 3: Deep scrape product detail pages for full descriptions
+                    product_urls = [p.get('url') for p in products if p.get('url')]
+                    if product_urls:
+                        logger.info(f"Found {len(product_urls)} product URLs, starting deep scrape...")
+
+                        # Update state to show deep scraping phase
+                        state["current_step"] = "deep_scraping"
+                        state["progress_percentage"] = 12
+
+                        detailed_products = await self._scrape_product_details(
+                            product_urls,
+                            state["category_url"],
+                            max_products=35,
+                            state=state  # Pass state for progress updates
+                        )
+
+                        # Merge detailed data with listing data
+                        if detailed_products:
+                            logger.info(f"Merging {len(detailed_products)} detailed products with listing data")
+                            products = self._merge_product_data(products, detailed_products)
+
+                        # Return to research step after deep scraping
+                        state["current_step"] = "research"
+                    else:
+                        logger.warning("No product URLs found, skipping deep scrape")
+
+                    # Step 4: Analyze with Claude to extract insights
                     logger.info("Analyzing products with Claude")
                     category_insights = self._analyze_category(products, html_content)
 
@@ -217,6 +243,217 @@ class ResearchAgent:
                     logger.error(f"[SCRAPER] Cleanup failed: {cleanup_error}")
             raise  # Re-raise to trigger fallback to mock data
 
+    async def _scrape_product_details(self, product_urls: List[str], base_url: str, max_products: int = 35, state: Dict = None) -> List[Dict]:
+        """
+        Scrape individual product detail pages to get full descriptions.
+
+        Args:
+            product_urls: List of product URLs to scrape
+            base_url: Base URL for resolving relative URLs
+            max_products: Maximum number of products to scrape (default: 35)
+            state: Campaign state for progress updates
+
+        Returns:
+            List of product detail dictionaries
+        """
+        from urllib.parse import urljoin
+
+        product_details = []
+        urls_to_scrape = product_urls[:max_products]
+        total_products = len(urls_to_scrape)
+
+        logger.info(f"[DEEP SCRAPER] Starting deep scrape of {total_products} product pages")
+
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox'
+                    ]
+                )
+
+                context = await browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                )
+
+                page = await context.new_page()
+                page.set_default_navigation_timeout(30000)  # 30s timeout per page
+                page.set_default_timeout(30000)
+
+                for i, url in enumerate(urls_to_scrape):
+                    try:
+                        # Update progress (deep scraping runs from 12% to 25% of total)
+                        if state:
+                            progress = 12 + (13 * (i / total_products))  # 12% to 25%
+                            state["progress_percentage"] = round(progress, 1)
+                            state["current_step"] = f"deep_scraping ({i+1}/{total_products})"
+
+                        # Resolve relative URLs
+                        full_url = urljoin(base_url, url)
+                        logger.info(f"[DEEP SCRAPER] Scraping product {i+1}/{total_products}: {full_url[:80]}...")
+
+                        await page.goto(full_url, wait_until="domcontentloaded")
+                        await page.wait_for_timeout(1500)  # Wait for dynamic content
+
+                        # Get page content
+                        html = await page.content()
+
+                        # Use Claude to extract product details
+                        detail = await self._extract_product_detail(html, full_url)
+                        if detail:
+                            detail['url'] = full_url
+                            product_details.append(detail)
+                            logger.info(f"[DEEP SCRAPER] Extracted details for: {detail.get('name', 'Unknown')[:50]}")
+
+                        # Small delay to avoid rate limiting
+                        await page.wait_for_timeout(500)
+
+                    except Exception as e:
+                        logger.warning(f"[DEEP SCRAPER] Failed to scrape {url}: {e}")
+                        continue
+
+                await browser.close()
+                logger.info(f"[DEEP SCRAPER] Completed deep scrape. Got details for {len(product_details)} products")
+
+        except Exception as e:
+            logger.error(f"[DEEP SCRAPER] Error during deep scrape: {e}", exc_info=True)
+
+        return product_details
+
+    async def _extract_product_detail(self, html_content: str, url: str) -> Dict:
+        """
+        Extract detailed product information from a product detail page.
+
+        Args:
+            html_content: HTML content of the product page
+            url: URL of the product page
+
+        Returns:
+            Dictionary with product details
+        """
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Remove scripts and styles for cleaner content
+        for tag in soup.find_all(['script', 'style', 'nav', 'header', 'footer']):
+            tag.decompose()
+
+        # Get the main content area
+        main_content = str(soup.find('main') or soup.find('body') or soup)[:40000]
+
+        prompt = f"""Extract detailed product information from this product detail page.
+
+URL: {url}
+
+Extract:
+1. Product name (full name)
+2. Price (current price, numeric)
+3. Original price if on sale (numeric, or null)
+4. Full description (complete product description, can be multiple paragraphs)
+5. Key features (bullet points or specifications)
+6. Material/fabric information
+7. Size information available
+8. Brand name
+9. Any care instructions
+
+HTML content:
+{main_content}
+
+IMPORTANT: Return ONLY valid JSON:
+{{
+  "name": "Full Product Name",
+  "price": 29.99,
+  "original_price": null,
+  "description": "Full detailed description...",
+  "features": ["feature 1", "feature 2"],
+  "material": "Cotton, Polyester, etc.",
+  "sizes": ["S", "M", "L"] or "One Size",
+  "brand": "Brand Name",
+  "care_instructions": "Machine wash at 30°C..."
+}}
+
+If you cannot find certain fields, use null for that field."""
+
+        try:
+            response = self.anthropic.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=2000,
+                temperature=0.2,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            import json
+            response_text = response.content[0].text.strip()
+
+            # Remove markdown code blocks if present
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            return json.loads(response_text)
+
+        except Exception as e:
+            logger.warning(f"[DEEP SCRAPER] Failed to extract details from {url}: {e}")
+            return None
+
+    def _merge_product_data(self, listing_products: List[Dict], detailed_products: List[Dict]) -> List[Dict]:
+        """
+        Merge detailed product data with listing page data.
+
+        Args:
+            listing_products: Products from listing page (basic info)
+            detailed_products: Products from detail pages (full descriptions)
+
+        Returns:
+            Merged list of products with full details
+        """
+        # Create a lookup by URL for detailed products
+        detailed_by_url = {}
+        for dp in detailed_products:
+            if dp.get('url'):
+                detailed_by_url[dp['url']] = dp
+
+        merged = []
+        for lp in listing_products:
+            product_url = lp.get('url', '')
+
+            # Try to find matching detailed product
+            detailed = None
+            for url_key, dp in detailed_by_url.items():
+                # Match by URL (handle relative vs absolute)
+                if url_key in product_url or product_url in url_key or \
+                   url_key.split('/')[-1] == product_url.split('/')[-1]:
+                    detailed = dp
+                    break
+
+            if detailed:
+                # Merge: detailed data takes priority, but keep listing data as fallback
+                merged_product = {
+                    'name': detailed.get('name') or lp.get('name', ''),
+                    'price': detailed.get('price') or lp.get('price'),
+                    'original_price': detailed.get('original_price'),
+                    'description': detailed.get('description') or lp.get('description', ''),
+                    'features': detailed.get('features') or lp.get('features', []),
+                    'material': detailed.get('material'),
+                    'sizes': detailed.get('sizes') or lp.get('sizes'),
+                    'brand': detailed.get('brand'),
+                    'care_instructions': detailed.get('care_instructions'),
+                    'url': detailed.get('url') or lp.get('url')
+                }
+                merged.append(merged_product)
+                logger.debug(f"Merged detailed data for: {merged_product['name'][:40]}")
+            else:
+                # No detailed data found, use listing data as-is
+                merged.append(lp)
+
+        logger.info(f"Merged {len([m for m in merged if m.get('description') and len(str(m.get('description', ''))) > 50])} products with full descriptions")
+        return merged
+
     def _parse_products(self, html_content: str, url: str) -> List[Dict]:
         """
         Parse product information from HTML.
@@ -228,28 +465,119 @@ class ResearchAgent:
         Returns:
             List of product dictionaries
         """
+        import re
+        import json as json_module
+
         soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Strategy 1: Look for embedded JSON product data (common in modern e-commerce)
+        # Many sites embed product data in script tags for SEO or client-side rendering
+        embedded_products = []
+
+        # Look for JSON-LD structured data
+        for script in soup.find_all('script', type='application/ld+json'):
+            try:
+                data = json_module.loads(script.string)
+                if isinstance(data, dict) and data.get('@type') in ['Product', 'ItemList', 'ProductCollection']:
+                    logger.info(f"Found JSON-LD product data")
+                    embedded_products.append(data)
+                elif isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and item.get('@type') in ['Product', 'ItemList']:
+                            embedded_products.append(item)
+            except (json_module.JSONDecodeError, TypeError):
+                pass
+
+        # Look for product data in script tags (common patterns)
+        for script in soup.find_all('script'):
+            if script.string:
+                # Look for common product data patterns
+                patterns = [
+                    r'window\.__INITIAL_STATE__\s*=\s*({.*?});',
+                    r'window\.products\s*=\s*(\[.*?\]);',
+                    r'"products"\s*:\s*(\[.*?\])',
+                    r'productData\s*=\s*({.*?});',
+                ]
+                for pattern in patterns:
+                    match = re.search(pattern, script.string, re.DOTALL)
+                    if match:
+                        try:
+                            data = json_module.loads(match.group(1))
+                            logger.info(f"Found embedded product data via pattern: {pattern[:30]}")
+                            if isinstance(data, list) and len(data) > 0:
+                                embedded_products.extend(data)
+                            elif isinstance(data, dict):
+                                embedded_products.append(data)
+                        except json_module.JSONDecodeError:
+                            pass
+
+        if embedded_products:
+            logger.info(f"Found {len(embedded_products)} embedded product entries, parsing...")
+            # Try to extract product info from embedded data
+            products = self._extract_from_embedded_data(embedded_products)
+            if products:
+                return products
+
+        # Strategy 2: Extract just the main content area (skip header/nav/footer)
+        main_content = ""
+
+        # Try to find main product area
+        product_containers = soup.find_all(['main', 'div'], class_=re.compile(r'product|catalog|listing|grid|items', re.I))
+        if product_containers:
+            for container in product_containers[:3]:  # Take first few matching containers
+                main_content += str(container)
+            logger.info(f"Extracted {len(main_content)} chars from product containers")
+
+        # If no product containers found, try to get body content minus scripts/styles
+        if len(main_content) < 5000:
+            body = soup.find('body')
+            if body:
+                # Remove script and style tags
+                for tag in body.find_all(['script', 'style', 'nav', 'header', 'footer', 'noscript']):
+                    tag.decompose()
+                main_content = str(body)
+                logger.info(f"Using cleaned body content: {len(main_content)} chars")
+
+        # Strategy 3: Send more content to Claude (increased from 30k to 80k chars)
+        # Take content from multiple positions to catch products
+        content_for_claude = ""
+
+        if main_content and len(main_content) > 1000:
+            # Use the extracted main content
+            content_for_claude = main_content[:80000]
+        else:
+            # Fallback: take beginning, middle and end of HTML
+            total_len = len(html_content)
+            content_for_claude = html_content[:40000]  # First 40k
+            if total_len > 80000:
+                # Add middle section
+                mid_start = (total_len // 2) - 20000
+                content_for_claude += "\n... [MIDDLE SECTION] ...\n" + html_content[mid_start:mid_start + 40000]
+
+        logger.info(f"Sending {len(content_for_claude)} chars to Claude for product parsing")
 
         # Use Claude to help parse the products intelligently
         prompt = f"""Analyze this HTML content from a children's clothing category page and extract product information.
 
 URL: {url}
 
-Extract as many products as you can find (aim for at least 20 products if available), including:
+Extract as many products as you can find (aim for at least 20-35 products if available), including:
 - Product name
 - Price (if available, convert to numeric format)
 - Brief description (if available)
 - Any key features mentioned
+- Product URL/link (the href to the product detail page - VERY IMPORTANT)
 
 Look for common HTML patterns like:
-- Product cards/tiles
+- Product cards/tiles with <a> links
 - Product list items
-- Data attributes (data-product, data-price, etc.)
+- Data attributes (data-product, data-price, data-url, etc.)
 - Price elements (class names with 'price', 'cost', etc.)
 - Product name elements (h2, h3, product titles)
+- Links to product detail pages (usually wrapping the product card or image)
 
-HTML content (first 30000 chars):
-{html_content[:30000]}
+HTML content:
+{content_for_claude}
 
 IMPORTANT: Return ONLY valid JSON, no other text. Format:
 {{
@@ -258,12 +586,14 @@ IMPORTANT: Return ONLY valid JSON, no other text. Format:
       "name": "Product Name",
       "price": 12.99,
       "description": "Brief description",
-      "features": ["feature1", "feature2"]
+      "features": ["feature1", "feature2"],
+      "url": "/product/123" or "https://example.com/product/123"
     }}
   ]
 }}
 
-Extract as many products as possible. If you find fewer than 20, extract all you can find.
+The URL field is critical - extract the href link to each product's detail page.
+Extract as many products as possible (up to 35). If you find fewer, extract all you can find.
 If you can't find specific products, return {{"products": [], "explanation": "reason"}}"""
 
         try:
@@ -305,6 +635,90 @@ If you can't find specific products, return {{"products": [], "explanation": "re
             logger.error(f"Error parsing products: {e}", exc_info=True)
             return self._get_mock_products()
 
+    def _extract_from_embedded_data(self, data_list: List) -> List[Dict]:
+        """
+        Extract product information from embedded JSON data (JSON-LD, __INITIAL_STATE__, etc.)
+
+        Args:
+            data_list: List of parsed JSON objects
+
+        Returns:
+            List of product dictionaries
+        """
+        products = []
+
+        for data in data_list:
+            try:
+                # Handle JSON-LD Product type
+                if isinstance(data, dict):
+                    if data.get('@type') == 'Product':
+                        product = {
+                            'name': data.get('name', ''),
+                            'price': None,
+                            'description': data.get('description', ''),
+                            'features': []
+                        }
+                        # Extract price from offers
+                        offers = data.get('offers', {})
+                        if isinstance(offers, dict):
+                            product['price'] = offers.get('price') or offers.get('lowPrice')
+                        elif isinstance(offers, list) and offers:
+                            product['price'] = offers[0].get('price')
+
+                        if product['name']:
+                            products.append(product)
+
+                    # Handle ItemList (list of products)
+                    elif data.get('@type') == 'ItemList':
+                        items = data.get('itemListElement', [])
+                        for item in items:
+                            if isinstance(item, dict):
+                                item_data = item.get('item', item)
+                                product = {
+                                    'name': item_data.get('name', ''),
+                                    'price': None,
+                                    'description': item_data.get('description', ''),
+                                    'features': []
+                                }
+                                offers = item_data.get('offers', {})
+                                if isinstance(offers, dict):
+                                    product['price'] = offers.get('price') or offers.get('lowPrice')
+                                if product['name']:
+                                    products.append(product)
+
+                    # Handle generic product objects (from __INITIAL_STATE__ etc.)
+                    elif 'name' in data or 'title' in data or 'productName' in data:
+                        product = {
+                            'name': data.get('name') or data.get('title') or data.get('productName', ''),
+                            'price': data.get('price') or data.get('salePrice') or data.get('finalPrice'),
+                            'description': data.get('description') or data.get('shortDescription', ''),
+                            'features': data.get('features', [])
+                        }
+                        if product['name']:
+                            products.append(product)
+
+                    # Handle nested products array
+                    if 'products' in data and isinstance(data['products'], list):
+                        for item in data['products']:
+                            if isinstance(item, dict):
+                                product = {
+                                    'name': item.get('name') or item.get('title', ''),
+                                    'price': item.get('price') or item.get('salePrice'),
+                                    'description': item.get('description', ''),
+                                    'features': item.get('features', [])
+                                }
+                                if product['name']:
+                                    products.append(product)
+
+            except Exception as e:
+                logger.debug(f"Error extracting from embedded data: {e}")
+                continue
+
+        if products:
+            logger.info(f"Extracted {len(products)} products from embedded JSON data")
+
+        return products
+
     def _analyze_category(self, products: List[Dict], html_content: str) -> Dict:
         """
         Analyze category and products to extract insights.
@@ -325,6 +739,20 @@ If you can't find specific products, return {{"products": [], "explanation": "re
                 "unique_selling_points": []
             }
 
+        # Extract cleaner content for analysis
+        import re
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Try to get just the main content for better analysis
+        main_content = ""
+        product_containers = soup.find_all(['main', 'div'], class_=re.compile(r'product|catalog|listing|grid|items', re.I))
+        if product_containers:
+            for container in product_containers[:3]:
+                main_content += str(container)
+
+        if len(main_content) < 5000:
+            main_content = html_content
+
         # Use Claude to analyze the ENTIRE page for comprehensive pricing
         prompt = f"""Analyze this category page HTML to extract comprehensive pricing data.
 
@@ -335,8 +763,8 @@ Look through ALL price elements on the page (not just a sample) and provide:
 4. Total number of products visible on the page
 5. Category name (extract from page title, breadcrumbs, or headings)
 
-HTML content (first 30000 chars):
-{html_content[:30000]}
+HTML content:
+{main_content[:60000]}
 
 IMPORTANT: Return ONLY valid JSON:
 {{

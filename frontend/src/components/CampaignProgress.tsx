@@ -9,6 +9,7 @@ interface CampaignProgressProps {
 
 const AGENT_STEPS = [
   { key: 'research', name: 'Research Agent', description: 'Analyzing category and products' },
+  { key: 'deep_scraping', name: 'Deep Product Scraping', description: 'Visiting product pages for detailed info', isSubStep: true },
   { key: 'content', name: 'Content Agent', description: 'Generating marketing copy' },
   { key: 'social_media', name: 'Social Media Agent', description: 'Creating social media strategy' },
   { key: 'ppc', name: 'PPC Agent', description: 'Building Google Ads campaign' },
@@ -92,11 +93,21 @@ const CampaignProgress: React.FC<CampaignProgressProps> = ({ campaignId, onCompl
           const isCompleted = index < currentStepIndex || campaign.status === 'completed';
           const isCurrent = index === currentStepIndex && campaign.status === 'running';
           const isPending = index > currentStepIndex;
+          const isSubStep = (agent as any).isSubStep;
+
+          // Get dynamic description for deep scraping (shows "Scraping product 5/35")
+          let description = agent.description;
+          if (agent.key === 'deep_scraping' && isCurrent && campaign.current_step) {
+            const match = campaign.current_step.match(/\((\d+)\/(\d+)\)/);
+            if (match) {
+              description = `Scraping product ${match[1]} of ${match[2]} for full details`;
+            }
+          }
 
           return (
             <div
               key={agent.key}
-              className={`agent-step ${isCompleted ? 'completed' : ''} ${isCurrent ? 'active' : ''} ${isPending ? 'pending' : ''}`}
+              className={`agent-step ${isCompleted ? 'completed' : ''} ${isCurrent ? 'active' : ''} ${isPending ? 'pending' : ''} ${isSubStep ? 'sub-step' : ''}`}
             >
               <div className="agent-step-icon">
                 {isCompleted ? (
@@ -107,12 +118,12 @@ const CampaignProgress: React.FC<CampaignProgressProps> = ({ campaignId, onCompl
                 ) : isCurrent ? (
                   <div className="spinner-small"></div>
                 ) : (
-                  <div className="step-number">{index + 1}</div>
+                  <div className="step-number">{isSubStep ? '↳' : index}</div>
                 )}
               </div>
               <div className="agent-step-content">
                 <div className="agent-step-name">{agent.name}</div>
-                <div className="agent-step-description">{agent.description}</div>
+                <div className="agent-step-description">{description}</div>
               </div>
             </div>
           );

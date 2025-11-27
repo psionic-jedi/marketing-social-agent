@@ -70,14 +70,21 @@ function App() {
     // Prevent card click when clicking delete button
     if (event) {
       event.stopPropagation();
+      event.preventDefault();
     }
 
+    console.log('Delete button clicked for campaign:', campaignId);
+
     if (!window.confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
+      console.log('Delete cancelled by user');
       return;
     }
 
+    console.log('Deleting campaign:', campaignId);
+
     try {
       await campaignService.deleteCampaign(campaignId);
+      console.log('Campaign deleted successfully:', campaignId);
 
       // If we're viewing the deleted campaign, go back to homepage
       if (selectedCampaign === campaignId) {
@@ -87,9 +94,10 @@ function App() {
 
       // Reload campaigns list
       loadCampaigns();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete campaign:', error);
-      alert('Failed to delete campaign. Please try again.');
+      console.error('Error details:', error?.response?.data || error?.message);
+      alert(`Failed to delete campaign: ${error?.response?.data?.detail || error?.message || 'Unknown error'}`);
     }
   };
 
@@ -116,10 +124,10 @@ function App() {
                 </defs>
               </svg>
             </div>
-            <h1>Marketing Agent System</h1>
+            <h1>Childrensalon Agentic Campaign System</h1>
           </div>
           <div className="header-right">
-            <p className="header-subtitle">AI-Powered Campaign Generation</p>
+            <p className="header-subtitle">AI-Powered Marketing Campaigns</p>
             <div className="stat-badge">
               <span className="stat-label">Total Campaigns</span>
               <span className="stat-value">{campaigns.length}</span>

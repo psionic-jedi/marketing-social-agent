@@ -160,6 +160,8 @@
   justify-content: center;
   font-size: 1rem;
   margin-left: auto;
+  position: relative;
+  z-index: 10;
 }
 
 .delete-btn-detail {

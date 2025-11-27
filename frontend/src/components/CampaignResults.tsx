@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CampaignResults as CampaignResultsType } from '../services/api';
 import './CampaignResults.css';
 
@@ -7,7 +7,13 @@ interface CampaignResultsProps {
   onDelete?: () => void;
 }
 
+interface EmailPreview {
+  subject: string;
+  html: string;
+}
+
 const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) => {
+  const [emailPreview, setEmailPreview] = useState<EmailPreview | null>(null);
   if (!results.results) {
     return (
       <div className="results-empty">
@@ -278,9 +284,20 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
                     <div className="email-timing">
                       <span className="stat-label">Send timing:</span> {email.send_timing}
                     </div>
-                    {email.mjml_template && (
+                    {email.html_template && (
+                      <button
+                        className="preview-btn"
+                        onClick={() => setEmailPreview({
+                          subject: email.subject_line || email.subject,
+                          html: email.html_template
+                        })}
+                      >
+                        👁️ Preview Email
+                      </button>
+                    )}
+                    {!email.html_template && email.mjml_template && (
                       <div className="email-meta">
-                        <span className="stat-label">✓ MJML Template Generated ({email.mjml_template.length} chars)</span>
+                        <span className="stat-label">✓ MJML Template ({email.mjml_template.length} chars)</span>
                       </div>
                     )}
                   </div>
@@ -352,6 +369,37 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
             </div>
           )}
         </section>
+      )}
+
+      {/* Email Preview Modal */}
+      {emailPreview && (
+        <div className="email-preview-modal" onClick={() => setEmailPreview(null)}>
+          <div className="email-preview-content" onClick={(e) => e.stopPropagation()}>
+            <div className="email-preview-header">
+              <h3>📧 {emailPreview.subject}</h3>
+              <button className="close-btn" onClick={() => setEmailPreview(null)}>✕</button>
+            </div>
+            <div className="email-preview-body">
+              <iframe
+                srcDoc={emailPreview.html}
+                title="Email Preview"
+                sandbox="allow-same-origin"
+                style={{ width: '100%', height: '500px', border: 'none', background: '#fff' }}
+              />
+            </div>
+            <div className="email-preview-footer">
+              <button
+                className="copy-btn"
+                onClick={() => {
+                  navigator.clipboard.writeText(emailPreview.html);
+                  alert('HTML copied to clipboard!');
+                }}
+              >
+                📋 Copy HTML
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

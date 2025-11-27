@@ -168,26 +168,41 @@ IMPORTANT: Return ONLY valid JSON in this exact format:
 
     def _generate_features(self, research_data: Dict) -> List[Dict]:
         """
-        Generate 3-5 feature callouts with benefit-focused copy.
+        Generate 4-8 feature callouts with benefit-focused copy.
 
         Args:
             research_data: Research data
 
         Returns:
-            List of feature dictionaries
+            List of feature dictionaries (min 4, max 8)
         """
         common_features = research_data.get("category_insights", {}).get("common_features", [])
         category_name = research_data.get("category_insights", {}).get("category_name", "Products")
+        products = research_data.get("products", [])
 
-        prompt = f"""Create 3 compelling feature callouts for a {category_name} category page.
+        # Extract additional features from products
+        product_features = []
+        for product in products[:10]:
+            product_features.extend(product.get("features", []))
+        all_features = list(set(common_features + product_features))[:10]
 
-Common Features Found:
-{', '.join(common_features[:5])}
+        prompt = f"""Create 6 compelling feature callouts for a {category_name} category page.
+
+Features Found in Products:
+{', '.join(all_features) if all_features else 'Quality materials, comfort, durability'}
 
 For each feature:
 1. Create a benefit-focused title (3-5 words)
-2. Write a description that addresses parent concerns (15-20 words)
-3. Assign an icon type: "quality", "comfort", or "care"
+2. Write a description that addresses parent concerns (15-25 words)
+3. Assign an icon type: "quality", "comfort", "care", "safety", "style", or "value"
+
+Create 6 UNIQUE feature callouts covering different aspects:
+- Material quality
+- Comfort & fit
+- Safety features
+- Style & design
+- Durability & care
+- Value proposition
 
 IMPORTANT: Return ONLY valid JSON in this exact format:
 {{
@@ -203,7 +218,7 @@ IMPORTANT: Return ONLY valid JSON in this exact format:
         try:
             response = self.anthropic.messages.create(
                 model="claude-sonnet-4-5-20250929",
-                max_tokens=800,
+                max_tokens=1500,
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -222,26 +237,45 @@ IMPORTANT: Return ONLY valid JSON in this exact format:
             data = json.loads(response_text)
             features = data.get("features", [])
             logger.info(f"Generated {len(features)} feature callouts")
-            return features[:3]
+            # Return min 4, max 8 features
+            return features[:8] if len(features) >= 4 else features + self._get_default_features()[:4-len(features)]
 
         except Exception as e:
             logger.error(f"Error generating features: {e}", exc_info=True)
-            # Fallback to default features
-            return [
-                {
-                    "title": "Premium Quality Materials",
-                    "description": "Made from the finest fabrics that are soft, durable, and safe for sensitive skin",
-                    "icon": "quality"
-                },
-                {
-                    "title": "Designed for Comfort",
-                    "description": "Every piece is crafted with your child's comfort in mind, perfect for all-day wear",
-                    "icon": "comfort"
-                },
-                {
-                    "title": "Easy Care & Maintenance",
-                    "description": "Machine washable and designed to last through countless washes and wear",
-                    "icon": "care"
+            return self._get_default_features()
+
+    def _get_default_features(self) -> List[Dict]:
+        """Return default feature callouts as fallback."""
+        return [
+            {
+                "title": "Premium Quality Materials",
+                "description": "Made from the finest fabrics that are soft, durable, and safe for sensitive skin",
+                "icon": "quality"
+            },
+            {
+                "title": "Designed for Comfort",
+                "description": "Every piece is crafted with your child's comfort in mind, perfect for all-day wear",
+                "icon": "comfort"
+            },
+            {
+                "title": "Easy Care & Maintenance",
+                "description": "Machine washable and designed to last through countless washes and wear",
+                "icon": "care"
+            },
+            {
+                "title": "Safety First Design",
+                "description": "Thoughtfully designed with child safety in mind, meeting the highest standards",
+                "icon": "safety"
+            },
+            {
+                "title": "Stylish & On-Trend",
+                "description": "Designer styles that keep your little ones looking fashionable and feeling confident",
+                "icon": "style"
+            },
+            {
+                "title": "Exceptional Value",
+                "description": "Investment pieces that combine luxury quality with lasting durability",
+                "icon": "value"
                 }
             ]
 
@@ -302,7 +336,6 @@ Length: 150-200 words"""
 
 Context:
 - Category: {category_name}
-- Products available: {len(products)}
 - Price range: £{price_range.get('min', 0):.2f} - £{price_range.get('max', 0):.2f}
 - Primary keywords: {', '.join(seo_keywords.get('primary', [])[:3])}
 
@@ -310,7 +343,9 @@ Create:
 1. Meta Title (50-60 characters) - Include main keyword and compelling hook
 2. Meta Description (150-160 characters) - Include USPs, keywords, and call-to-action
 
-IMPORTANT: Return ONLY valid JSON:
+IMPORTANT:
+- Do NOT include specific product counts or numbers like "35+" or "50+"
+- Return ONLY valid JSON:
 {{
   "meta_title": "Your title here",
   "meta_description": "Your description here"
