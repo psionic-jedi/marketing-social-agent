@@ -704,7 +704,7 @@ class CRMAgent:
             "Clean email list quarterly (remove hard bounces)",
             "Implement double opt-in for quality subscribers",
             "Use MJML for responsive email design",
-            "Track opens, clicks, conversions for optimization"
+            "Track opens, clicks, conversions for optimisation"
         ]
 
     def _get_mjml_header(self) -> str:

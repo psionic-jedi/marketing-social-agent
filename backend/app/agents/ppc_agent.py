@@ -100,10 +100,23 @@ class PPCAgent:
             logger.info("Generating negative keywords")
             negative_keywords = self._generate_negative_keywords(category_insights)
 
+            # Generate campaign type recommendations
+            logger.info("Generating campaign type recommendations")
+            campaign_types = self._generate_campaign_types(budget, category_insights, products)
+
+            # Generate KPI targets
+            logger.info("Calculating KPI targets")
+            kpi_targets = self._generate_kpi_targets(budget, category_insights, products)
+
+            # Generate strategic budget allocation across campaign types
+            logger.info("Creating strategic budget allocation")
+            strategic_allocation = self._generate_strategic_allocation(budget, campaign_types, kpi_targets)
+
             # Compile PPC campaign
             ppc_campaign = {
                 "campaign_name": f"{category_insights.get('category_name', 'Product')} - Search Campaign",
-                "campaign_type": "Search",
+                "campaign_types": campaign_types,
+                "recommended_campaign_mix": strategic_allocation["campaign_mix"],
                 "budget_daily": budget_allocation["daily_budget"],
                 "budget_monthly": budget,
                 "bidding_strategy": "Maximize Conversions",
@@ -112,6 +125,8 @@ class PPCAgent:
                 "ads": ads,
                 "negative_keywords": negative_keywords,
                 "budget_allocation": budget_allocation,
+                "strategic_allocation": strategic_allocation,
+                "kpi_targets": kpi_targets,
                 "targeting": self._generate_targeting_settings(research_data),
                 "tracking": self._generate_tracking_setup(),
                 "product_intelligence": {
@@ -892,4 +907,426 @@ Return ONLY valid JSON:
             "tracking_template": "{lpurl}?utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}",
             "gtm_setup": "Required: Set up Google Tag Manager with Google Ads conversion tracking",
             "enhanced_conversions": "Recommended: Enable for better attribution"
+        }
+
+    def _generate_campaign_types(self, budget: float, category_insights: Dict, products: List[Dict]) -> Dict:
+        """
+        Generate recommendations for different Google Ads campaign types.
+
+        Args:
+            budget: Monthly budget
+            category_insights: Category analysis data
+            products: List of products
+
+        Returns:
+            Dict with campaign type recommendations
+        """
+        category_name = category_insights.get("category_name", "Products")
+        price_range = category_insights.get("price_range", {})
+        avg_price = price_range.get("avg", 50)
+        product_count = len(products)
+
+        # Determine if Shopping campaigns are viable (need product feed)
+        has_sufficient_products = product_count >= 20
+        is_high_aov = avg_price >= 30  # High average order value
+
+        campaign_types = {
+            "search": {
+                "name": "Search Campaigns",
+                "recommended": True,
+                "priority": "High",
+                "description": "Text ads shown on Google Search results",
+                "best_for": "Capturing high-intent buyers actively searching",
+                "expected_roas": "3.0x - 5.0x",
+                "recommended_budget_percentage": 40,
+                "setup_complexity": "Medium",
+                "time_to_results": "1-2 weeks",
+                "subtypes": [
+                    {
+                        "name": "Brand Search",
+                        "description": "Protect brand terms and competitor conquesting",
+                        "budget_percentage": 10,
+                        "expected_roas": "8.0x - 12.0x"
+                    },
+                    {
+                        "name": "Non-Brand Search",
+                        "description": "Generic category and product keywords",
+                        "budget_percentage": 30,
+                        "expected_roas": "2.5x - 4.0x"
+                    }
+                ]
+            },
+            "performance_max": {
+                "name": "Performance Max",
+                "recommended": has_sufficient_products,
+                "priority": "High" if has_sufficient_products else "Medium",
+                "description": "AI-driven campaigns across all Google channels",
+                "best_for": "Maximising conversions with automated optimisation",
+                "expected_roas": "2.5x - 4.5x",
+                "recommended_budget_percentage": 35 if has_sufficient_products else 20,
+                "setup_complexity": "Low",
+                "time_to_results": "2-4 weeks (learning period)",
+                "requirements": [
+                    "Product feed in Google Merchant Center",
+                    "High-quality images and videos",
+                    "Conversion tracking set up",
+                    "Audience signals configured"
+                ],
+                "asset_groups": [
+                    {
+                        "name": f"Premium {category_name}",
+                        "theme": "Luxury/Designer products",
+                        "audience_signals": ["In-market: Luxury Shoppers", "Affinity: Fashion Enthusiasts"]
+                    },
+                    {
+                        "name": f"Value {category_name}",
+                        "theme": "Best value products",
+                        "audience_signals": ["In-market: Bargain Hunters", "Affinity: Budget Conscious Parents"]
+                    }
+                ]
+            },
+            "shopping": {
+                "name": "Standard Shopping",
+                "recommended": has_sufficient_products,
+                "priority": "High" if has_sufficient_products else "Low",
+                "description": "Product listing ads with images and prices",
+                "best_for": "Visual product discovery with price comparison",
+                "expected_roas": "4.0x - 6.0x",
+                "recommended_budget_percentage": 25 if has_sufficient_products else 0,
+                "setup_complexity": "Medium",
+                "time_to_results": "1-2 weeks",
+                "requirements": [
+                    "Google Merchant Center account",
+                    "Product feed with accurate data",
+                    "Competitive pricing"
+                ],
+                "campaign_structure": {
+                    "priority_high": {
+                        "name": "Shopping - High Priority (Brands)",
+                        "products": "Top designer brands only",
+                        "bid_strategy": "Target ROAS 400%"
+                    },
+                    "priority_medium": {
+                        "name": "Shopping - Medium Priority (Category)",
+                        "products": "All category products",
+                        "bid_strategy": "Maximize Conversion Value"
+                    },
+                    "priority_low": {
+                        "name": "Shopping - Low Priority (Catchall)",
+                        "products": "Everything else",
+                        "bid_strategy": "Manual CPC (conservative)"
+                    }
+                }
+            },
+            "display": {
+                "name": "Display Campaigns",
+                "recommended": budget >= 3000,
+                "priority": "Medium",
+                "description": "Visual banner ads across Google Display Network",
+                "best_for": "Brand awareness and remarketing",
+                "expected_roas": "1.5x - 3.0x",
+                "recommended_budget_percentage": 10,
+                "setup_complexity": "Medium",
+                "time_to_results": "2-4 weeks",
+                "subtypes": [
+                    {
+                        "name": "Remarketing",
+                        "description": "Re-engage past visitors",
+                        "budget_percentage": 7,
+                        "expected_roas": "4.0x - 8.0x",
+                        "audiences": ["All visitors - 30 days", "Cart abandoners - 14 days", "Past purchasers - 90 days"]
+                    },
+                    {
+                        "name": "Prospecting",
+                        "description": "Find new customers with similar audiences",
+                        "budget_percentage": 3,
+                        "expected_roas": "1.0x - 2.0x",
+                        "audiences": ["Similar to purchasers", "In-market: Children's Products"]
+                    }
+                ]
+            },
+            "youtube": {
+                "name": "YouTube Video Campaigns",
+                "recommended": budget >= 5000 and is_high_aov,
+                "priority": "Low" if budget < 5000 else "Medium",
+                "description": "Video ads on YouTube",
+                "best_for": "Brand storytelling and product demonstrations",
+                "expected_roas": "1.0x - 2.5x",
+                "recommended_budget_percentage": 5 if budget >= 5000 else 0,
+                "setup_complexity": "High",
+                "time_to_results": "4-8 weeks",
+                "requirements": [
+                    "High-quality video content",
+                    "Budget for video production",
+                    "Clear brand message"
+                ],
+                "ad_formats": [
+                    {"name": "Skippable In-Stream", "best_for": "Brand awareness", "min_budget": "£50/day"},
+                    {"name": "Non-Skippable In-Stream", "best_for": "Key messages", "min_budget": "£75/day"},
+                    {"name": "Video Discovery", "best_for": "Engagement", "min_budget": "£30/day"}
+                ]
+            },
+            "demand_gen": {
+                "name": "Demand Gen Campaigns",
+                "recommended": budget >= 4000,
+                "priority": "Medium",
+                "description": "Visual campaigns across YouTube, Gmail, and Discover",
+                "best_for": "Mid-funnel engagement with visual storytelling",
+                "expected_roas": "2.0x - 3.5x",
+                "recommended_budget_percentage": 10 if budget >= 4000 else 0,
+                "setup_complexity": "Medium",
+                "time_to_results": "3-6 weeks",
+                "requirements": [
+                    "High-quality images (multiple aspect ratios)",
+                    "Compelling headlines and descriptions",
+                    "Strong audience signals"
+                ]
+            }
+        }
+
+        return campaign_types
+
+    def _generate_kpi_targets(self, budget: float, category_insights: Dict, products: List[Dict]) -> Dict:
+        """
+        Generate KPI targets including ROAS, profitability, and other metrics.
+
+        Args:
+            budget: Monthly budget
+            category_insights: Category analysis data
+            products: List of products
+
+        Returns:
+            Dict with KPI targets and benchmarks
+        """
+        price_range = category_insights.get("price_range", {})
+        avg_price = price_range.get("avg", 50)
+        min_price = price_range.get("min", 20)
+        max_price = price_range.get("max", 200)
+
+        # Estimate margins based on price tier (luxury = higher margin)
+        if avg_price >= 100:
+            estimated_margin = 0.45  # 45% margin for luxury
+            margin_tier = "Premium/Luxury"
+        elif avg_price >= 50:
+            estimated_margin = 0.35  # 35% margin for mid-range
+            margin_tier = "Mid-Range"
+        else:
+            estimated_margin = 0.25  # 25% margin for value
+            margin_tier = "Value"
+
+        # Calculate break-even ROAS
+        break_even_roas = 1 / estimated_margin
+
+        # Target ROAS should be above break-even for profitability
+        target_roas = break_even_roas * 1.5  # 50% above break-even
+        stretch_roas = break_even_roas * 2.0  # 100% above break-even
+
+        # Calculate estimated metrics based on budget
+        estimated_cpc = 0.80 if avg_price < 50 else (1.20 if avg_price < 100 else 1.80)
+        estimated_ctr = 0.035  # 3.5% CTR
+        estimated_cvr = 0.025  # 2.5% conversion rate
+
+        estimated_clicks = budget / estimated_cpc
+        estimated_conversions = estimated_clicks * estimated_cvr
+        estimated_revenue = estimated_conversions * avg_price
+        estimated_profit = (estimated_revenue * estimated_margin) - budget
+
+        kpi_targets = {
+            "profitability_analysis": {
+                "margin_tier": margin_tier,
+                "estimated_gross_margin": f"{estimated_margin * 100:.0f}%",
+                "break_even_roas": round(break_even_roas, 2),
+                "target_roas_for_profit": round(target_roas, 2),
+                "explanation": f"With an estimated {estimated_margin*100:.0f}% gross margin, you need at least {break_even_roas:.1f}x ROAS to break even. Target {target_roas:.1f}x for healthy profitability."
+            },
+            "roas_targets": {
+                "minimum_roas": round(break_even_roas, 2),
+                "target_roas": round(target_roas, 2),
+                "stretch_roas": round(stretch_roas, 2),
+                "by_campaign_type": {
+                    "brand_search": {"target": 8.0, "minimum": 5.0},
+                    "non_brand_search": {"target": round(target_roas, 2), "minimum": round(break_even_roas, 2)},
+                    "shopping": {"target": round(target_roas * 1.2, 2), "minimum": round(break_even_roas, 2)},
+                    "performance_max": {"target": round(target_roas, 2), "minimum": round(break_even_roas * 0.9, 2)},
+                    "display_remarketing": {"target": 5.0, "minimum": 3.0},
+                    "display_prospecting": {"target": 2.0, "minimum": 1.0}
+                }
+            },
+            "efficiency_targets": {
+                "target_cpa": round(avg_price * estimated_margin * 0.4, 2),  # 40% of margin
+                "maximum_cpa": round(avg_price * estimated_margin * 0.6, 2),  # 60% of margin
+                "target_cpc": round(estimated_cpc, 2),
+                "target_ctr": "3.0% - 5.0%",
+                "target_cvr": "2.0% - 4.0%",
+                "target_impression_share": "60% - 80%"
+            },
+            "revenue_targets": {
+                "monthly_budget": budget,
+                "target_revenue": round(budget * target_roas, 2),
+                "stretch_revenue": round(budget * stretch_roas, 2),
+                "target_orders": round(budget * target_roas / avg_price, 0),
+                "target_aov": round(avg_price * 1.1, 2),  # 10% above current avg
+                "target_profit": round((budget * target_roas * estimated_margin) - budget, 2)
+            },
+            "estimated_performance": {
+                "monthly_clicks": round(estimated_clicks, 0),
+                "monthly_conversions": round(estimated_conversions, 0),
+                "estimated_revenue": round(estimated_revenue, 2),
+                "estimated_roas": round(estimated_revenue / budget, 2),
+                "estimated_profit": round(estimated_profit, 2),
+                "profit_margin_on_adspend": f"{(estimated_profit / budget) * 100:.1f}%" if budget > 0 else "N/A"
+            },
+            "optimization_thresholds": {
+                "pause_threshold": {
+                    "roas_below": round(break_even_roas * 0.7, 2),
+                    "cpa_above": round(avg_price * estimated_margin * 0.8, 2),
+                    "action": "Pause underperforming keywords/ad groups"
+                },
+                "scale_threshold": {
+                    "roas_above": round(target_roas * 1.3, 2),
+                    "cpa_below": round(avg_price * estimated_margin * 0.3, 2),
+                    "action": "Increase budget by 20-30%"
+                },
+                "test_threshold": {
+                    "min_clicks": 100,
+                    "min_spend": round(budget * 0.05, 2),
+                    "action": "Minimum data before optimization decisions"
+                }
+            },
+            "benchmarks": {
+                "industry": "Children's Fashion/Retail",
+                "typical_cpc": "£0.60 - £1.50",
+                "typical_ctr": "2.5% - 4.5%",
+                "typical_cvr": "1.5% - 3.5%",
+                "typical_roas": "2.5x - 5.0x",
+                "source": "Industry averages - actual results vary"
+            }
+        }
+
+        return kpi_targets
+
+    def _generate_strategic_allocation(self, budget: float, campaign_types: Dict, kpi_targets: Dict) -> Dict:
+        """
+        Generate strategic budget allocation across campaign types.
+
+        Args:
+            budget: Monthly budget
+            campaign_types: Campaign type recommendations
+            kpi_targets: KPI targets
+
+        Returns:
+            Dict with strategic budget allocation
+        """
+        daily_budget = budget / 30
+
+        # Calculate allocation based on recommendations
+        campaign_mix = []
+        total_percentage = 0
+
+        # Priority order for budget allocation
+        priority_order = ["search", "performance_max", "shopping", "display", "demand_gen", "youtube"]
+
+        for campaign_key in priority_order:
+            campaign = campaign_types.get(campaign_key, {})
+            if campaign.get("recommended", False):
+                percentage = campaign.get("recommended_budget_percentage", 0)
+                if total_percentage + percentage <= 100:
+                    monthly_allocation = budget * (percentage / 100)
+                    daily_allocation = monthly_allocation / 30
+
+                    campaign_mix.append({
+                        "campaign_type": campaign.get("name", campaign_key),
+                        "percentage": percentage,
+                        "monthly_budget": round(monthly_allocation, 2),
+                        "daily_budget": round(daily_allocation, 2),
+                        "priority": campaign.get("priority", "Medium"),
+                        "expected_roas": campaign.get("expected_roas", "N/A"),
+                        "time_to_results": campaign.get("time_to_results", "2-4 weeks")
+                    })
+                    total_percentage += percentage
+
+        # If budget remains, allocate to testing
+        remaining_percentage = 100 - total_percentage
+        if remaining_percentage > 0:
+            campaign_mix.append({
+                "campaign_type": "Testing & Experiments",
+                "percentage": remaining_percentage,
+                "monthly_budget": round(budget * (remaining_percentage / 100), 2),
+                "daily_budget": round((budget * (remaining_percentage / 100)) / 30, 2),
+                "priority": "Low",
+                "expected_roas": "Variable",
+                "time_to_results": "Ongoing"
+            })
+
+        # Phase recommendations based on budget
+        if budget < 2000:
+            phase_recommendation = {
+                "phase": "Foundation",
+                "focus": "Search campaigns only",
+                "rationale": "Build conversion data before expanding",
+                "next_step": "Add Shopping/PMax at £3,000+ monthly"
+            }
+        elif budget < 5000:
+            phase_recommendation = {
+                "phase": "Growth",
+                "focus": "Search + Shopping/Performance Max",
+                "rationale": "Balanced approach for scaling",
+                "next_step": "Add Display remarketing at £5,000+ monthly"
+            }
+        else:
+            phase_recommendation = {
+                "phase": "Scale",
+                "focus": "Full-funnel campaigns",
+                "rationale": "Budget supports multi-channel approach",
+                "next_step": "Test YouTube/Demand Gen for brand building"
+            }
+
+        return {
+            "campaign_mix": campaign_mix,
+            "total_monthly_budget": budget,
+            "total_daily_budget": round(daily_budget, 2),
+            "phase_recommendation": phase_recommendation,
+            "allocation_strategy": {
+                "high_intent": {
+                    "campaigns": ["Search (Brand)", "Shopping"],
+                    "budget_percentage": "40-50%",
+                    "goal": "Capture ready-to-buy customers"
+                },
+                "mid_funnel": {
+                    "campaigns": ["Search (Non-Brand)", "Performance Max"],
+                    "budget_percentage": "35-45%",
+                    "goal": "Convert interested shoppers"
+                },
+                "awareness": {
+                    "campaigns": ["Display", "YouTube", "Demand Gen"],
+                    "budget_percentage": "10-20%",
+                    "goal": "Build brand and drive new traffic"
+                }
+            },
+            "scaling_rules": [
+                {
+                    "trigger": f"ROAS consistently above {kpi_targets['roas_targets']['stretch_roas']}x for 2 weeks",
+                    "action": "Increase budget by 20%",
+                    "focus": "Scale winning campaigns first"
+                },
+                {
+                    "trigger": f"ROAS below {kpi_targets['roas_targets']['minimum_roas']}x for 2 weeks",
+                    "action": "Reduce budget by 20% or pause",
+                    "focus": "Reallocate to better performers"
+                },
+                {
+                    "trigger": "Campaign limited by budget with strong ROAS",
+                    "action": "Prioritize budget increase",
+                    "focus": "Don't leave money on the table"
+                }
+            ],
+            "monthly_review_checklist": [
+                "Compare actual ROAS vs targets by campaign type",
+                "Review search term reports for negative keyword opportunities",
+                "Check impression share - increase budget if limited",
+                "Analyze device and time-of-day performance",
+                "Review audience performance in PMax/Display",
+                "Test new ad copy variations",
+                "Update product feed if using Shopping/PMax"
+            ]
         }

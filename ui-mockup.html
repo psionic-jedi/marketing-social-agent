@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campaign Results - UI Mockup</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+      background-attachment: fixed;
+      color: #e2e8f0;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Animated gradient background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(120, 80, 220, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(80, 200, 220, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 40% 70%, rgba(220, 80, 180, 0.08) 0%, transparent 40%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glassmorphism base */
+    .glass {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-light {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Header */
+    .header {
+      background: rgba(15, 12, 41, 0.8);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 20px 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, #fff 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header-url {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 4px;
+    }
+
+    .header-meta {
+      display: flex;
+      gap: 20px;
+      font-size: 0.875rem;
+      color: rgba(255, 255, 255, 0.7);
+      align-items: center;
+    }
+
+    .status-badge {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+    }
+
+    /* Main Container */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Summary Cards */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .summary-card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .summary-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    }
+
+    .summary-card:hover {
+      transform: translateY(-2px);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .summary-card.green::before { background: linear-gradient(90deg, #10b981, #34d399); }
+    .summary-card.blue::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+    .summary-card.purple::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+    .summary-card.orange::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .summary-card.pink::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
+    .summary-card.teal::before { background: linear-gradient(90deg, #14b8a6, #2dd4bf); }
+
+    .summary-card h3 {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+
+    .summary-card .value {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .summary-card .detail {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.4);
+      margin-top: 4px;
+    }
+
+    /* Tab Navigation */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px;
+      border-radius: 16px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+    }
+
+    .tabs::-webkit-scrollbar {
+      height: 0;
+    }
+
+    .tab {
+      padding: 12px 20px;
+      border: none;
+      background: transparent;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.5);
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .tab:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .tab.active {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.8) 0%, rgba(139, 92, 246, 0.8) 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+
+    .tab .icon {
+      margin-right: 8px;
+    }
+
+    /* Content Panels */
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Section Cards */
+    .section-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .section-header {
+      padding: 18px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      transition: background 0.2s;
+    }
+
+    .section-header:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .section-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #fff;
+    }
+
+    .section-header .badge {
+      background: rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .section-header .toggle {
+      color: rgba(255, 255, 255, 0.4);
+      transition: transform 0.3s;
+    }
+
+    .section-card.collapsed .section-header .toggle {
+      transform: rotate(-90deg);
+    }
+
+    .section-card.collapsed .section-content {
+      display: none;
+    }
+
+    .section-content {
+      padding: 24px;
+    }
+
+    /* Sub-sections with accordion */
+    .accordion {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .accordion:last-child {
+      margin-bottom: 0;
+    }
+
+    .accordion-header {
+      padding: 14px 18px;
+      background: rgba(255, 255, 255, 0.02);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.8);
+      transition: background 0.2s;
+    }
+
+    .accordion-header:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .accordion-content {
+      padding: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      display: none;
+    }
+
+    .accordion.open .accordion-content {
+      display: block;
+    }
+
+    .accordion.open .accordion-header .arrow {
+      transform: rotate(90deg);
+    }
+
+    .arrow {
+      transition: transform 0.2s;
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Data Grid */
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .data-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 18px;
+      transition: all 0.3s ease;
+    }
+
+    .data-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .data-card h4 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .data-card p {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
+      line-height: 1.6;
+    }
+
+    .data-card .meta {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      font-size: 0.7rem;
+    }
+
+    .data-card .meta span {
+      background: rgba(255, 255, 255, 0.06);
+      padding: 4px 10px;
+      border-radius: 6px;
+      color: rgba(255, 255, 255, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* Tables */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.03);
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.7);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .data-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .data-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Email Preview */
+    .email-preview {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .email-header {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .email-header strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #fff;
+    }
+
+    .email-header span {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .email-body {
+      padding: 18px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 0.875rem;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    /* Ad Creative Preview */
+    .ad-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .ad-preview {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .ad-preview:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .ad-preview-image {
+      height: 160px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .ad-preview-content {
+      padding: 18px;
+    }
+
+    .ad-preview-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .ad-preview-content p {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+
+    .ad-preview .cta {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: inline-block;
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Tags */
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .tag {
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .tag.green {
+      background: rgba(16, 185, 129, 0.2);
+      color: #6ee7b7;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .tag.blue {
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+      border-color: rgba(59, 130, 246, 0.3);
+    }
+    .tag.orange {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fcd34d;
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+    .tag.pink {
+      background: rgba(236, 72, 153, 0.2);
+      color: #f9a8d4;
+      border-color: rgba(236, 72, 153, 0.3);
+    }
+
+    /* Progress Indicators */
+    .progress-bar {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress-bar .fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #8b5cf6);
+      border-radius: 3px;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+    }
+
+    /* Budget Breakdown */
+    .budget-visual {
+      display: flex;
+      height: 28px;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 20px 0;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .budget-segment {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .budget-segment.awareness { background: linear-gradient(135deg, #6366f1, #818cf8); }
+    .budget-segment.prospecting { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
+    .budget-segment.retargeting { background: linear-gradient(135deg, #ec4899, #f472b6); }
+
+    .budget-legend {
+      display: flex;
+      gap: 28px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .budget-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .budget-legend-item .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      padding: 12px 22px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.3s ease;
+      color: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      transform: translateY(-2px);
+    }
+
+    .action-btn.primary {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      color: white;
+      border: none;
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .action-btn.primary:hover {
+      box-shadow: 0 6px 25px rgba(99, 102, 241, 0.5);
+    }
+
+    /* Keyword chips */
+    .keyword-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .keyword {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      transition: all 0.2s;
+    }
+
+    .keyword:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .keyword .volume {
+      background: rgba(99, 102, 241, 0.3);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      color: #a5b4fc;
+    }
+
+    /* Insights callout */
+    .insight-callout {
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 14px;
+    }
+
+    .insight-callout .icon {
+      font-size: 1.5rem;
+    }
+
+    .insight-callout h4 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #fcd34d;
+    }
+
+    .insight-callout p {
+      font-size: 0.8rem;
+      color: rgba(252, 211, 77, 0.8);
+      line-height: 1.6;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header-content {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+      }
+
+      .header-meta {
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .tabs {
+        justify-content: flex-start;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .quick-actions {
+        justify-content: center;
+      }
+    }
+
+    /* Glow effects */
+    .glow-purple {
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
+    }
+
+    .glow-blue {
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+    }
+
+    /* List styles */
+    .styled-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .styled-list li {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .styled-list li:last-child {
+      border-bottom: none;
+    }
+
+    .styled-list li strong {
+      display: block;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .styled-list li span {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <div>
+        <h1>Baby Clothing Campaign</h1>
+        <div class="header-url">https://example.com/baby-clothing</div>
+      </div>
+      <div class="header-meta">
+        <span class="status-badge">Completed</span>
+        <span>Budget: £5,000</span>
+        <span>Created: Nov 27, 2025</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <button class="action-btn primary">
+        <span>📥</span> Export All
+      </button>
+      <button class="action-btn">
+        <span>📧</span> Download Emails
+      </button>
+      <button class="action-btn">
+        <span>📊</span> Export to CSV
+      </button>
+      <button class="action-btn">
+        <span>🔄</span> Regenerate
+      </button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+      <div class="summary-card">
+        <h3>Products Found</h3>
+        <div class="value">24</div>
+        <div class="detail">From 5 brands</div>
+      </div>
+      <div class="summary-card green">
+        <h3>Content Pieces</h3>
+        <div class="value">8</div>
+        <div class="detail">Headlines, descriptions, blogs</div>
+      </div>
+      <div class="summary-card blue">
+        <h3>Social Posts</h3>
+        <div class="value">12</div>
+        <div class="detail">Across 4 platforms</div>
+      </div>
+      <div class="summary-card purple">
+        <h3>PPC Keywords</h3>
+        <div class="value">45</div>
+        <div class="detail">£2.40 avg CPC</div>
+      </div>
+      <div class="summary-card orange">
+        <h3>Meta Ad Sets</h3>
+        <div class="value">5</div>
+        <div class="detail">With 4 copy variations</div>
+      </div>
+      <div class="summary-card pink">
+        <h3>Email Templates</h3>
+        <div class="value">6</div>
+        <div class="detail">Welcome, promo, cart</div>
+      </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tabs">
+      <button class="tab active" onclick="showPanel('overview')">
+        <span class="icon">📋</span>Overview
+      </button>
+      <button class="tab" onclick="showPanel('research')">
+        <span class="icon">🔍</span>Research
+      </button>
+      <button class="tab" onclick="showPanel('content')">
+        <span class="icon">✍️</span>Content
+      </button>
+      <button class="tab" onclick="showPanel('social')">
+        <span class="icon">📱</span>Social Media
+      </button>
+      <button class="tab" onclick="showPanel('ppc')">
+        <span class="icon">🎯</span>Google Ads
+      </button>
+      <button class="tab" onclick="showPanel('meta')">
+        <span class="icon">📘</span>Meta Ads
+      </button>
+      <button class="tab" onclick="showPanel('crm')">
+        <span class="icon">📧</span>Email & CRM
+      </button>
+      <button class="tab" onclick="showPanel('analytics')">
+        <span class="icon">📊</span>Analytics
+      </button>
+    </div>
+
+    <!-- Overview Panel -->
+    <div id="overview" class="panel active">
+      <div class="insight-callout">
+        <span class="icon">💡</span>
+        <div>
+          <h4>Campaign Insight</h4>
+          <p>This campaign targets parents of newborns to 2-year-olds. The luxury segment shows strong purchase intent with an estimated 3.2x ROAS potential based on competitor analysis.</p>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>🎯</span> Key Recommendations
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="data-grid">
+            <div class="data-card">
+              <h4>Focus on Organic Cotton</h4>
+              <p>Products featuring "organic" and "sustainable" see 40% higher engagement. Emphasize these in ad copy.</p>
+              <div class="meta">
+                <span>High Priority</span>
+                <span>Content + PPC</span>
+              </div>
+            </div>
+            <div class="data-card">
+              <h4>Target Gift Buyers</h4>
+              <p>20% of traffic comes from gift searches. Create dedicated gift guide content and landing pages.</p>
+              <div class="meta">
+                <span>Medium Priority</span>
+                <span>Social + Email</span>
+              </div>
+            </div>
+            <div class="data-card">
+              <h4>Leverage Brand Heritage</h4>
+              <p>Premium positioning resonates with audience. Highlight craftsmanship and heritage in messaging.</p>
+              <div class="meta">
+                <span>High Priority</span>
+                <span>All Channels</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>💰</span> Budget Allocation
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="budget-visual">
+            <div class="budget-segment awareness" style="width: 25%">25%</div>
+            <div class="budget-segment prospecting" style="width: 45%">45%</div>
+            <div class="budget-segment retargeting" style="width: 30%">30%</div>
+          </div>
+          <div class="budget-legend">
+            <div class="budget-legend-item">
+              <div class="dot" style="background: linear-gradient(135deg, #6366f1, #818cf8); color: #6366f1;"></div>
+              <span>Awareness - £1,250</span>
+            </div>
+            <div class="budget-legend-item">
+              <div class="dot" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); color: #8b5cf6;"></div>
+              <span>Prospecting - £2,250</span>
+            </div>
+            <div class="budget-legend-item">
+              <div class="dot" style="background: linear-gradient(135deg, #ec4899, #f472b6); color: #ec4899;"></div>
+              <span>Retargeting - £1,500</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Research Panel -->
+    <div id="research" class="panel">
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>🛍️</span> Products Discovered
+            <span class="badge">24 items</span>
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Brand</th>
+                <th>Price</th>
+                <th>Rating</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="color: #fff;">Organic Cotton Sleepsuit Set</td>
+                <td>Petit Bateau</td>
+                <td>£45.00</td>
+                <td>4.8 ⭐</td>
+              </tr>
+              <tr>
+                <td style="color: #fff;">Cashmere Blend Cardigan</td>
+                <td>Bonpoint</td>
+                <td>£120.00</td>
+                <td>4.9 ⭐</td>
+              </tr>
+              <tr>
+                <td style="color: #fff;">Floral Print Dress Set</td>
+                <td>Rachel Riley</td>
+                <td>£85.00</td>
+                <td>4.7 ⭐</td>
+              </tr>
+              <tr>
+                <td style="color: #fff;">Merino Wool Romper</td>
+                <td>Tartine et Chocolat</td>
+                <td>£78.00</td>
+                <td>4.6 ⭐</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="text-align: center; margin-top: 20px;">
+            <button class="action-btn">Show All 24 Products</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>🏷️</span> Brands Analysis
+            <span class="badge">5 brands</span>
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="tag-list">
+            <span class="tag">Petit Bateau (8 products)</span>
+            <span class="tag green">Bonpoint (6 products)</span>
+            <span class="tag blue">Rachel Riley (4 products)</span>
+            <span class="tag orange">Tartine et Chocolat (4 products)</span>
+            <span class="tag pink">Absorba (2 products)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>📈</span> Market Insights
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="data-grid">
+            <div class="data-card">
+              <h4>Price Range</h4>
+              <p>£25 - £180 with average price point of £72</p>
+            </div>
+            <div class="data-card">
+              <h4>Top Categories</h4>
+              <p>Sleepsuits (35%), Bodysuits (25%), Knitwear (20%)</p>
+            </div>
+            <div class="data-card">
+              <h4>Material Trends</h4>
+              <p>70% organic cotton, 15% cashmere blend, 15% merino</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content Panel -->
+    <div id="content" class="panel">
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>📝</span> Headlines & Taglines
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="accordion open">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>Primary Headlines</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <ul class="styled-list">
+                <li>
+                  <strong>Luxury Comfort for Your Little One</strong>
+                  <span>Emotional appeal, premium positioning</span>
+                </li>
+                <li>
+                  <strong>Timeless Style, Thoughtful Design</strong>
+                  <span>Heritage focus, quality emphasis</span>
+                </li>
+                <li>
+                  <strong>Crafted with Care, Made to Last</strong>
+                  <span>Sustainability angle, durability</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>Category Descriptions</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <p style="font-size: 0.875rem; line-height: 1.8; color: rgba(255,255,255,0.6);">
+                Discover our curated collection of premium baby clothing, featuring the finest organic cottons
+                and luxurious natural fabrics. Each piece is thoughtfully designed for comfort and style,
+                from delicate sleepsuits perfect for newborns to charming outfits for special occasions.
+              </p>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>Blog Post Ideas</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <div class="data-grid">
+                <div class="data-card">
+                  <h4>The Ultimate Guide to Organic Baby Clothing</h4>
+                  <p>Educational content targeting first-time parents</p>
+                </div>
+                <div class="data-card">
+                  <h4>Capsule Wardrobe: Baby's First Year</h4>
+                  <p>Practical guide with product recommendations</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Social Media Panel -->
+    <div id="social" class="panel">
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>📱</span> Social Media Calendar
+            <span class="badge">12 posts</span>
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="accordion open">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>📸 Instagram (4 posts)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <div class="data-grid">
+                <div class="data-card">
+                  <h4>Carousel: New Arrivals</h4>
+                  <p>"Soft, sustainable, and oh-so-stylish. Meet our newest arrivals in organic cotton..."</p>
+                  <div class="meta">
+                    <span>Week 1</span>
+                    <span>Product Focus</span>
+                  </div>
+                </div>
+                <div class="data-card">
+                  <h4>Reel: Behind the Fabric</h4>
+                  <p>"From field to fabric - see how our organic cotton is sourced..."</p>
+                  <div class="meta">
+                    <span>Week 2</span>
+                    <span>Brand Story</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>📘 Facebook (3 posts)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <p style="color: rgba(255,255,255,0.5);">Facebook content...</p>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>📌 Pinterest (3 posts)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <p style="color: rgba(255,255,255,0.5);">Pinterest content...</p>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>🎵 TikTok (2 posts)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <p style="color: rgba(255,255,255,0.5);">TikTok content...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PPC Panel -->
+    <div id="ppc" class="panel">
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>🔑</span> Keywords
+            <span class="badge">45 keywords</span>
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="accordion open">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>High Intent (12)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <div class="keyword-grid">
+                <div class="keyword">buy organic baby clothes <span class="volume">2.4K/mo</span></div>
+                <div class="keyword">luxury baby sleepsuit <span class="volume">1.8K/mo</span></div>
+                <div class="keyword">designer baby clothing uk <span class="volume">1.2K/mo</span></div>
+                <div class="keyword">premium newborn outfits <span class="volume">980/mo</span></div>
+                <div class="keyword">cashmere baby cardigan <span class="volume">720/mo</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>Mid Intent (18)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <div class="keyword-grid">
+                <div class="keyword">best baby sleepsuits <span class="volume">5.4K/mo</span></div>
+                <div class="keyword">organic cotton baby <span class="volume">4.2K/mo</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>Brand Terms (15)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <p style="color: rgba(255,255,255,0.5);">Brand keywords...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>📝</span> Ad Copy
+            <span class="badge">3 variations</span>
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="data-grid">
+            <div class="data-card">
+              <h4>Responsive Search Ad 1</h4>
+              <p><strong style="color: rgba(255,255,255,0.8);">Headlines:</strong> Premium Baby Clothing | Organic & Sustainable | Free UK Delivery</p>
+              <p style="margin-top: 8px;"><strong style="color: rgba(255,255,255,0.8);">Description:</strong> Discover our collection of luxury baby clothing. Crafted from the finest organic materials...</p>
+            </div>
+            <div class="data-card">
+              <h4>Responsive Search Ad 2</h4>
+              <p><strong style="color: rgba(255,255,255,0.8);">Headlines:</strong> Designer Baby Clothes | Shop New Arrivals | Quality That Lasts</p>
+              <p style="margin-top: 8px;"><strong style="color: rgba(255,255,255,0.8);">Description:</strong> Timeless designs for your little one. From sleepsuits to special occasion wear...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Meta Ads Panel -->
+    <div id="meta" class="panel">
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>👥</span> Audience Targeting
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="accordion open">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>Core Audiences (3)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <div class="data-grid">
+                <div class="data-card">
+                  <h4>New Parents - Premium</h4>
+                  <p>Parents with children 0-2, interested in premium brands, organic products</p>
+                  <div class="meta">
+                    <span>Est. reach: 2.4M</span>
+                    <span>High affinity</span>
+                  </div>
+                </div>
+                <div class="data-card">
+                  <h4>Gift Buyers - Affluent</h4>
+                  <p>High income, interested in baby gifts, luxury shopping</p>
+                  <div class="meta">
+                    <span>Est. reach: 1.8M</span>
+                    <span>Seasonal peak</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>Lookalike Audiences (2)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <div class="data-grid">
+                <div class="data-card">
+                  <h4>1% Lookalike - Purchasers</h4>
+                  <p>Similar to existing customers who completed purchases</p>
+                </div>
+                <div class="data-card">
+                  <h4>2% Lookalike - High Value</h4>
+                  <p>Similar to top 10% customers by lifetime value</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>🎨</span> Ad Creatives
+            <span class="badge">5 formats</span>
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="ad-preview-grid">
+            <div class="ad-preview">
+              <div class="ad-preview-image">Single Image Ad</div>
+              <div class="ad-preview-content">
+                <h4>Luxury Baby Clothing</h4>
+                <p>Discover timeless pieces crafted from organic cotton. Perfect for your little one.</p>
+                <span class="cta">Shop Now</span>
+              </div>
+            </div>
+            <div class="ad-preview">
+              <div class="ad-preview-image" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">Carousel Ad</div>
+              <div class="ad-preview-content">
+                <h4>New Season Arrivals</h4>
+                <p>Swipe to explore our curated collection of premium baby essentials.</p>
+                <span class="cta">View Collection</span>
+              </div>
+            </div>
+            <div class="ad-preview">
+              <div class="ad-preview-image" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">Stories / Reels</div>
+              <div class="ad-preview-content">
+                <h4>Behind the Brand</h4>
+                <p>See how we source the finest organic materials for your baby.</p>
+                <span class="cta">Learn More</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>✍️</span> Ad Copy Variations
+            <span class="badge">4 variations</span>
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Style</th>
+                <th>Primary Text</th>
+                <th>CTA</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="tag">Emotional</span></td>
+                <td style="color: rgba(255,255,255,0.7);">Because they deserve the softest start. Our organic cotton collection...</td>
+                <td>Shop Now</td>
+              </tr>
+              <tr>
+                <td><span class="tag green">Premium</span></td>
+                <td style="color: rgba(255,255,255,0.7);">Luxury meets comfort. Discover designer pieces for your little one...</td>
+                <td>Explore</td>
+              </tr>
+              <tr>
+                <td><span class="tag blue">Practical</span></td>
+                <td style="color: rgba(255,255,255,0.7);">Easy-change designs. Machine washable. Built to last through endless adventures...</td>
+                <td>Shop Collection</td>
+              </tr>
+              <tr>
+                <td><span class="tag orange">Urgency</span></td>
+                <td style="color: rgba(255,255,255,0.7);">New arrivals just landed. Limited stock on bestselling styles...</td>
+                <td>Shop Before Gone</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CRM Panel -->
+    <div id="crm" class="panel">
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>📧</span> Email Templates
+            <span class="badge">6 emails</span>
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="accordion open">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>Welcome Series (3 emails)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <div class="email-preview">
+                <div class="email-header">
+                  <strong>Welcome to Childrensalon</strong>
+                  <span>Subject: Welcome to the family - Here's 10% off your first order</span>
+                </div>
+                <div class="email-body">
+                  <p>Dear {first_name},</p>
+                  <p style="margin-top: 12px;">Welcome to Childrensalon! We're delighted to have you join our community of parents who appreciate quality and craftsmanship...</p>
+                  <p style="margin-top: 12px; color: #a78bfa; font-weight: 500;">Use code WELCOME10 for 10% off</p>
+                </div>
+              </div>
+              <div style="text-align: center;">
+                <button class="action-btn">Preview Full Email</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>Promotional Campaign (2 emails)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <p style="color: rgba(255,255,255,0.5);">Promotional emails...</p>
+            </div>
+          </div>
+
+          <div class="accordion">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+              <span>Cart Abandonment (1 email)</span>
+              <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-content">
+              <p style="color: rgba(255,255,255,0.5);">Cart abandonment email...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>👥</span> Customer Segments
+            <span class="badge">4 segments</span>
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="data-grid">
+            <div class="data-card">
+              <h4>VIP Customers</h4>
+              <p>High lifetime value, frequent purchasers</p>
+              <div class="progress-bar"><div class="fill" style="width: 15%"></div></div>
+              <div class="detail" style="margin-top: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.4);">~15% of database</div>
+            </div>
+            <div class="data-card">
+              <h4>New Parents</h4>
+              <p>Recent sign-ups with newborn indicators</p>
+              <div class="progress-bar"><div class="fill" style="width: 35%"></div></div>
+              <div class="detail" style="margin-top: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.4);">~35% of database</div>
+            </div>
+            <div class="data-card">
+              <h4>Gift Buyers</h4>
+              <p>Seasonal purchasers, gift messaging used</p>
+              <div class="progress-bar"><div class="fill" style="width: 25%"></div></div>
+              <div class="detail" style="margin-top: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.4);">~25% of database</div>
+            </div>
+            <div class="data-card">
+              <h4>Lapsed Customers</h4>
+              <p>No purchase in 6+ months</p>
+              <div class="progress-bar"><div class="fill" style="width: 25%"></div></div>
+              <div class="detail" style="margin-top: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.4);">~25% of database</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics Panel -->
+    <div id="analytics" class="panel">
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>📊</span> Performance Projections
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Conservative</th>
+                <th>Expected</th>
+                <th>Optimistic</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="color: #fff;">Monthly Revenue</td>
+                <td>£12,500</td>
+                <td style="color: #a78bfa;">£18,000</td>
+                <td>£25,000</td>
+              </tr>
+              <tr>
+                <td style="color: #fff;">ROAS</td>
+                <td>2.5x</td>
+                <td style="color: #a78bfa;">3.6x</td>
+                <td>5.0x</td>
+              </tr>
+              <tr>
+                <td style="color: #fff;">New Customers</td>
+                <td>85</td>
+                <td style="color: #a78bfa;">120</td>
+                <td>180</td>
+              </tr>
+              <tr>
+                <td style="color: #fff;">Email Open Rate</td>
+                <td>18%</td>
+                <td style="color: #a78bfa;">24%</td>
+                <td>32%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header" onclick="toggleSection(this)">
+          <h2>
+            <span>⚠️</span> Risk Analysis
+          </h2>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="section-content">
+          <div class="data-grid">
+            <div class="data-card">
+              <h4>Seasonality Risk</h4>
+              <p>Baby clothing sees peaks in spring/autumn. Plan budget accordingly.</p>
+              <div class="meta">
+                <span class="tag orange">Medium</span>
+              </div>
+            </div>
+            <div class="data-card">
+              <h4>Competition</h4>
+              <p>High competition on branded terms. Consider long-tail keywords.</p>
+              <div class="meta">
+                <span class="tag orange">Medium</span>
+              </div>
+            </div>
+            <div class="data-card">
+              <h4>Creative Fatigue</h4>
+              <p>Refresh ad creatives every 2-3 weeks to maintain performance.</p>
+              <div class="meta">
+                <span class="tag">Low</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function showPanel(panelId) {
+      // Hide all panels
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      // Show selected panel
+      document.getElementById(panelId).classList.add('active');
+      // Update tabs
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      event.target.closest('.tab').classList.add('active');
+    }
+
+    function toggleSection(header) {
+      const card = header.closest('.section-card');
+      card.classList.toggle('collapsed');
+    }
+
+    function toggleAccordion(header) {
+      const accordion = header.closest('.accordion');
+      accordion.classList.toggle('open');
+    }
+  </script>
+
+</body>
+</html>

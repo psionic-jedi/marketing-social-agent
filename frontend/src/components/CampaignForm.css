@@ -1,9 +1,12 @@
+/* Campaign Form - Dark Glassmorphic Theme */
+
 .campaign-form-container {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
-  padding: var(--spacing-2xl);
-  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-xl);
 }
 
 .campaign-form-header {
@@ -11,7 +14,7 @@
 }
 
 .campaign-form-header h2 {
-  font-size: 1.875rem;
+  font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: var(--spacing-sm);
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
@@ -21,8 +24,8 @@
 }
 
 .campaign-form-header p {
-  color: var(--text-secondary);
-  font-size: 0.938rem;
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
 }
 
 .campaign-form {
@@ -47,33 +50,35 @@
 }
 
 .required {
-  color: var(--accent-error);
+  color: var(--error);
 }
 
 .optional {
   color: var(--text-muted);
   font-weight: 400;
-  font-size: 0.813rem;
+  font-size: 0.75rem;
 }
 
 .form-input {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 0.875rem 1rem;
   color: var(--text-primary);
   font-size: 0.938rem;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   outline: none;
 }
 
 .form-input:hover:not(:disabled) {
-  border-color: var(--border-secondary);
+  border-color: var(--glass-border-hover);
+  background: var(--glass-bg-hover);
 }
 
 .form-input:focus {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background: var(--glass-bg-hover);
 }
 
 .form-input:disabled {
@@ -104,8 +109,8 @@
 }
 
 .form-hint {
-  font-size: 0.813rem;
-  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .error-message {
@@ -113,10 +118,10 @@
   align-items: center;
   gap: var(--spacing-sm);
   padding: 0.75rem 1rem;
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.15);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: var(--radius-md);
-  color: var(--accent-error);
+  border-radius: var(--radius-lg);
+  color: var(--error-light);
   font-size: 0.875rem;
 }
 
@@ -132,19 +137,19 @@
   padding: 0.875rem 1.5rem;
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   color: white;
   font-weight: 600;
   font-size: 0.938rem;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px var(--glow-primary);
   margin-top: var(--spacing-md);
 }
 
 .submit-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px var(--glow-primary);
 }
 
 .submit-button:active:not(:disabled) {

@@ -363,7 +363,7 @@ class AnalystAgent:
             },
             {
                 "priority": "Medium",
-                "category": "Conversion Optimization",
+                "category": "Conversion Optimisation",
                 "recommendation": "Add trust badges and parent reviews to category page",
                 "rationale": "Social proof increases conversion rate by 15-20%",
                 "expected_impact": "15% lift in conversion rate",

@@ -60,7 +60,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({ onCampaignCreated }) => {
             disabled={isLoading}
           />
           <span className="form-hint">
-            Enter the URL of the product category page you want to analyze
+            Enter the URL of the product category page you want to analyse
           </span>
         </div>
 

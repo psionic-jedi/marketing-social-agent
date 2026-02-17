@@ -1,31 +1,65 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import CampaignForm from './components/CampaignForm';
 import CampaignResults from './components/CampaignResults';
 import CampaignProgress from './components/CampaignProgress';
 import { Campaign, CampaignResults as CampaignResultsType, campaignService } from './services/api';
 import './App.css';
 
+// Toast notification type
+interface ToastNotification {
+  id: string;
+  message: string;
+  type: 'success' | 'info' | 'warning';
+  campaignId?: string;
+}
+
 function App() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [campaignResults, setCampaignResults] = useState<CampaignResultsType | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
-  // Load campaigns on mount
-  useEffect(() => {
-    loadCampaigns();
+  // Track running campaigns to detect completion
+  const runningCampaignsRef = useRef<Set<string>>(new Set());
+
+  // Add a toast notification
+  const addToast = useCallback((message: string, type: ToastNotification['type'] = 'success', campaignId?: string) => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, message, type, campaignId }]);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5000);
   }, []);
 
-  // Load campaign results when selected
-  useEffect(() => {
-    if (selectedCampaign) {
-      loadCampaignResults(selectedCampaign);
-    }
-  }, [selectedCampaign]);
+  // Remove a toast
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
 
-  const loadCampaigns = async () => {
+  // Load campaigns function (defined before useEffects that use it)
+  const loadCampaigns = useCallback(async () => {
     try {
       const data = await campaignService.getCampaigns();
+
+      // Check for newly completed campaigns
+      const previouslyRunning = runningCampaignsRef.current;
+      data.forEach(campaign => {
+        if (previouslyRunning.has(campaign.id) && campaign.status === 'completed') {
+          // Campaign just completed!
+          const hostname = new URL(campaign.category_url).hostname;
+          addToast(`Campaign completed: ${hostname}`, 'success', campaign.id);
+          previouslyRunning.delete(campaign.id);
+        }
+      });
+
+      // Track currently running campaigns
+      runningCampaignsRef.current = new Set(
+        data.filter(c => c.status === 'running' || c.status === 'pending').map(c => c.id)
+      );
+
       // Sort campaigns: completed first, then by creation date (newest first)
       const sorted = data.sort((a, b) => {
         // Prioritize completed campaigns
@@ -38,7 +72,7 @@ function App() {
     } catch (error) {
       console.error('Failed to load campaigns:', error);
     }
-  };
+  }, [addToast]);
 
   const loadCampaignResults = async (id: string) => {
     setIsLoading(true);
@@ -51,6 +85,32 @@ function App() {
       setIsLoading(false);
     }
   };
+
+  // Load campaigns on mount
+  useEffect(() => {
+    loadCampaigns();
+  }, [loadCampaigns]);
+
+  // Load campaign results when selected
+  useEffect(() => {
+    if (selectedCampaign) {
+      loadCampaignResults(selectedCampaign);
+    }
+  }, [selectedCampaign]);
+
+  // Poll for campaign status updates when there are running campaigns
+  useEffect(() => {
+    const hasRunningCampaigns = campaigns.some(c => c.status === 'running' || c.status === 'pending');
+
+    if (hasRunningCampaigns && !selectedCampaign) {
+      // Poll every 5 seconds when on homepage with running campaigns
+      const interval = setInterval(() => {
+        loadCampaigns();
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [campaigns, selectedCampaign, loadCampaigns]);
 
   const handleCampaignCreated = (campaign: Campaign) => {
     setCampaigns([campaign, ...campaigns]);
@@ -111,20 +171,10 @@ function App() {
       <header className="app-header">
         <div className="header-content">
           <div className="header-left">
-            <div className="logo">
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="8" fill="url(#gradient)"/>
-                <path d="M16 8L8 13L16 18L24 13L16 8Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M8 18L16 23L24 18" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <defs>
-                  <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32">
-                    <stop stopColor="#6366f1"/>
-                    <stop offset="1" stopColor="#8b5cf6"/>
-                  </linearGradient>
-                </defs>
-              </svg>
+            <div className="logo monogram">
+              <span>AM</span>
             </div>
-            <h1>Childrensalon Agentic Campaign System</h1>
+            <h1>Childrensalon Agentic Marketing System</h1>
           </div>
           <div className="header-right">
             <p className="header-subtitle">AI-Powered Marketing Campaigns</p>
@@ -222,6 +272,40 @@ function App() {
           </main>
         )}
       </div>
+
+      {/* Toast Notifications */}
+      {toasts.length > 0 && (
+        <div className="toast-container">
+          {toasts.map(toast => (
+            <div
+              key={toast.id}
+              className={`toast toast-${toast.type}`}
+              onClick={() => {
+                if (toast.campaignId) {
+                  setSelectedCampaign(toast.campaignId);
+                }
+                removeToast(toast.id);
+              }}
+            >
+              <div className="toast-content">
+                <span className="toast-icon">
+                  {toast.type === 'success' ? '✓' : toast.type === 'warning' ? '⚠' : 'ℹ'}
+                </span>
+                <span className="toast-message">{toast.message}</span>
+              </div>
+              <button
+                className="toast-close"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeToast(toast.id);
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

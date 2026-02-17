@@ -53,19 +53,48 @@ class ResearchAgent:
                 products = self._get_mock_products()
                 category_insights = self._get_mock_insights()
             else:
-                # Step 1: Scrape category page (with 60s timeout)
+                # Step 1: Scrape category page(s) with pagination support
                 logger.info(f"Scraping category page: {state['category_url']}")
+                all_products = []
+                all_html_content = ""
+                target_min_products = 60
+
                 try:
+                    # Scrape first page
                     html_content = await self._scrape_page(state["category_url"])
+                    all_html_content = html_content
+
+                    # Parse products from first page
+                    logger.info("Parsing product data from listing page")
+                    products = self._parse_products(html_content, state["category_url"])
+                    all_products.extend(products)
+                    logger.info(f"Found {len(products)} products on page 1")
+
+                    # If we don't have enough products, try pagination
+                    if len(all_products) < target_min_products:
+                        logger.info(f"Only found {len(all_products)} products, attempting pagination...")
+                        paginated_products = await self._scrape_paginated_products(
+                            state["category_url"],
+                            existing_products=all_products,
+                            target_count=target_min_products,
+                            max_pages=5
+                        )
+                        if paginated_products:
+                            # Deduplicate by URL
+                            existing_urls = {p.get('url') for p in all_products if p.get('url')}
+                            for prod in paginated_products:
+                                if prod.get('url') and prod.get('url') not in existing_urls:
+                                    all_products.append(prod)
+                                    existing_urls.add(prod.get('url'))
+                            logger.info(f"After pagination: {len(all_products)} total products")
+
+                    products = all_products
+
                 except Exception as scrape_error:
                     logger.warning(f"Scraping failed, falling back to mock data: {scrape_error}")
                     products = self._get_mock_products()
                     category_insights = self._get_mock_insights()
                 else:
-                    # Step 2: Parse product data from listing page
-                    logger.info("Parsing product data from listing page")
-                    products = self._parse_products(html_content, state["category_url"])
-
                     # Step 3: Deep scrape product detail pages for full descriptions
                     product_urls = [p.get('url') for p in products if p.get('url')]
                     if product_urls:
@@ -78,7 +107,8 @@ class ResearchAgent:
                         detailed_products = await self._scrape_product_details(
                             product_urls,
                             state["category_url"],
-                            max_products=35,
+                            max_products=120,
+                            min_products=60,
                             state=state  # Pass state for progress updates
                         )
 
@@ -94,7 +124,7 @@ class ResearchAgent:
 
                     # Step 4: Analyze with Claude to extract insights
                     logger.info("Analyzing products with Claude")
-                    category_insights = self._analyze_category(products, html_content)
+                    category_insights = self._analyze_category(products, all_html_content if all_html_content else html_content)
 
             # Step 4: Research parent questions
             logger.info("Researching parent questions")
@@ -108,12 +138,21 @@ class ResearchAgent:
                 category_insights.get("category_name", "")
             )
 
+            # Step 6: Generate content/article ideas
+            logger.info("Generating content ideas")
+            content_ideas = self._generate_content_ideas(
+                products=products,
+                category_insights=category_insights,
+                parent_questions=parent_questions
+            )
+
             # Compile research data
             research_data = {
                 "products": products,
                 "category_insights": category_insights,
                 "parent_questions": parent_questions,
                 "seo_keywords": seo_keywords,
+                "content_ideas": content_ideas,
                 "competitor_insights": {
                     "effective_messaging": [],
                     "content_gaps": []
@@ -188,12 +227,67 @@ class ResearchAgent:
                 await page.wait_for_timeout(3000)
                 logger.info(f"[SCRAPER] Dynamic content wait complete")
 
-                # Scroll the page to load more products (many sites lazy-load)
-                logger.info(f"[SCRAPER] Scrolling page to load more products...")
-                for i in range(3):
+                # Scroll the page multiple times to load more products (many sites lazy-load)
+                logger.info(f"[SCRAPER] Scrolling page to load more products (15 scrolls)...")
+                for i in range(15):
                     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    await page.wait_for_timeout(1000)
+                    await page.wait_for_timeout(800)
+
+                    # Every 5 scrolls, try clicking "Load More" or "Show More" buttons
+                    if i % 5 == 4:
+                        try:
+                            load_more_selectors = [
+                                'button:has-text("Load More")',
+                                'button:has-text("Show More")',
+                                'button:has-text("View More")',
+                                'a:has-text("Load More")',
+                                'a:has-text("Show More")',
+                                '[class*="load-more"]',
+                                '[class*="show-more"]',
+                                '[class*="loadmore"]',
+                                '[data-action="load-more"]',
+                            ]
+                            for selector in load_more_selectors:
+                                try:
+                                    btn = page.locator(selector).first
+                                    if await btn.is_visible(timeout=500):
+                                        await btn.click()
+                                        logger.info(f"[SCRAPER] Clicked load more button: {selector}")
+                                        await page.wait_for_timeout(2000)
+                                        break
+                                except:
+                                    continue
+                        except Exception as e:
+                            pass  # No load more button found, continue scrolling
+
                 logger.info(f"[SCRAPER] Page scrolling complete")
+
+                # Try to click any remaining "Load More" buttons
+                for _ in range(3):
+                    try:
+                        load_more_clicked = False
+                        load_more_selectors = [
+                            'button:has-text("Load More")',
+                            'button:has-text("Show More")',
+                            'button:has-text("View More")',
+                            '[class*="load-more"]',
+                            '[class*="loadmore"]',
+                        ]
+                        for selector in load_more_selectors:
+                            try:
+                                btn = page.locator(selector).first
+                                if await btn.is_visible(timeout=500):
+                                    await btn.click()
+                                    logger.info(f"[SCRAPER] Clicked additional load more: {selector}")
+                                    await page.wait_for_timeout(2000)
+                                    load_more_clicked = True
+                                    break
+                            except:
+                                continue
+                        if not load_more_clicked:
+                            break
+                    except:
+                        break
 
                 # Get page content
                 logger.info(f"[SCRAPER] Extracting page content...")
@@ -243,14 +337,157 @@ class ResearchAgent:
                     logger.error(f"[SCRAPER] Cleanup failed: {cleanup_error}")
             raise  # Re-raise to trigger fallback to mock data
 
-    async def _scrape_product_details(self, product_urls: List[str], base_url: str, max_products: int = 35, state: Dict = None) -> List[Dict]:
+    async def _scrape_paginated_products(self, base_url: str, existing_products: List[Dict], target_count: int = 60, max_pages: int = 5) -> List[Dict]:
+        """
+        Scrape additional pages to get more products via pagination.
+
+        Args:
+            base_url: The original category URL
+            existing_products: Products already scraped from page 1
+            target_count: Target number of products to reach
+            max_pages: Maximum number of additional pages to scrape
+
+        Returns:
+            List of additional products from paginated pages
+        """
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
+        all_new_products = []
+        current_count = len(existing_products)
+
+        logger.info(f"[PAGINATION] Starting pagination scrape. Current: {current_count}, Target: {target_count}")
+
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox'
+                    ]
+                )
+
+                context = await browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                )
+
+                page = await context.new_page()
+                page.set_default_navigation_timeout(45000)
+                page.set_default_timeout(45000)
+
+                for page_num in range(2, max_pages + 2):  # Start from page 2
+                    if current_count + len(all_new_products) >= target_count:
+                        logger.info(f"[PAGINATION] Reached target count, stopping pagination")
+                        break
+
+                    # Try different pagination URL patterns
+                    pagination_urls = self._generate_pagination_urls(base_url, page_num)
+
+                    page_scraped = False
+                    for pag_url in pagination_urls:
+                        try:
+                            logger.info(f"[PAGINATION] Trying page {page_num}: {pag_url[:80]}...")
+                            await page.goto(pag_url, wait_until="domcontentloaded")
+                            await page.wait_for_timeout(2000)
+
+                            # Scroll to load lazy content
+                            for _ in range(5):
+                                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                                await page.wait_for_timeout(500)
+
+                            html_content = await page.content()
+
+                            # Parse products from this page
+                            page_products = self._parse_products(html_content, pag_url)
+
+                            if page_products and len(page_products) > 0:
+                                logger.info(f"[PAGINATION] Found {len(page_products)} products on page {page_num}")
+                                all_new_products.extend(page_products)
+                                page_scraped = True
+                                break
+                            else:
+                                logger.info(f"[PAGINATION] No products found at {pag_url[:50]}, trying next pattern")
+
+                        except Exception as e:
+                            logger.warning(f"[PAGINATION] Failed to scrape {pag_url[:50]}: {e}")
+                            continue
+
+                    if not page_scraped:
+                        logger.info(f"[PAGINATION] Could not find page {page_num}, stopping pagination")
+                        break
+
+                    await page.wait_for_timeout(1000)  # Brief delay between pages
+
+                await browser.close()
+
+        except Exception as e:
+            logger.error(f"[PAGINATION] Error during pagination: {e}", exc_info=True)
+
+        logger.info(f"[PAGINATION] Pagination complete. Found {len(all_new_products)} additional products")
+        return all_new_products
+
+    def _generate_pagination_urls(self, base_url: str, page_num: int) -> List[str]:
+        """
+        Generate possible pagination URL patterns for a given page number.
+
+        Args:
+            base_url: The original URL
+            page_num: The page number to generate URLs for
+
+        Returns:
+            List of possible pagination URLs to try
+        """
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
+        urls = []
+        parsed = urlparse(base_url)
+
+        # Pattern 1: ?page=N or &page=N
+        query_params = parse_qs(parsed.query)
+        query_params['page'] = [str(page_num)]
+        new_query = urlencode(query_params, doseq=True)
+        urls.append(urlunparse(parsed._replace(query=new_query)))
+
+        # Pattern 2: ?p=N
+        query_params2 = parse_qs(parsed.query)
+        query_params2['p'] = [str(page_num)]
+        new_query2 = urlencode(query_params2, doseq=True)
+        urls.append(urlunparse(parsed._replace(query=new_query2)))
+
+        # Pattern 3: /page/N/ in path
+        path = parsed.path.rstrip('/')
+        if '/page/' not in path:
+            new_path = f"{path}/page/{page_num}/"
+            urls.append(urlunparse(parsed._replace(path=new_path)))
+
+        # Pattern 4: ?start=N (offset-based, assuming ~24 products per page)
+        query_params4 = parse_qs(parsed.query)
+        query_params4['start'] = [str((page_num - 1) * 24)]
+        new_query4 = urlencode(query_params4, doseq=True)
+        urls.append(urlunparse(parsed._replace(query=new_query4)))
+
+        # Pattern 5: ?offset=N
+        query_params5 = parse_qs(parsed.query)
+        query_params5['offset'] = [str((page_num - 1) * 24)]
+        new_query5 = urlencode(query_params5, doseq=True)
+        urls.append(urlunparse(parsed._replace(query=new_query5)))
+
+        # Pattern 6: #page=N (hash-based, less common but worth trying)
+        urls.append(f"{base_url}#page={page_num}")
+
+        return urls
+
+    async def _scrape_product_details(self, product_urls: List[str], base_url: str, max_products: int = 120, min_products: int = 60, state: Dict = None) -> List[Dict]:
         """
         Scrape individual product detail pages to get full descriptions.
 
         Args:
             product_urls: List of product URLs to scrape
             base_url: Base URL for resolving relative URLs
-            max_products: Maximum number of products to scrape (default: 35)
+            max_products: Maximum number of products to scrape (default: 120)
+            min_products: Minimum number of products to aim for (default: 60)
             state: Campaign state for progress updates
 
         Returns:
@@ -259,7 +496,10 @@ class ResearchAgent:
         from urllib.parse import urljoin
 
         product_details = []
-        urls_to_scrape = product_urls[:max_products]
+        # Ensure we scrape at least min_products if available, up to max_products
+        available_urls = len(product_urls)
+        target_products = min(max_products, max(min_products, available_urls))
+        urls_to_scrape = product_urls[:target_products]
         total_products = len(urls_to_scrape)
 
         logger.info(f"[DEEP SCRAPER] Starting deep scrape of {total_products} product pages")
@@ -467,8 +707,57 @@ If you cannot find certain fields, use null for that field."""
         """
         import re
         import json as json_module
+        from urllib.parse import urljoin
 
         soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Strategy 0: Direct product link extraction (most reliable)
+        # Find all product links by common patterns
+        product_links = set()
+
+        # Pattern 1: Links with product-related classes or data attributes
+        product_link_selectors = [
+            'a[class*="product"]',
+            'a[class*="Product"]',
+            'a[data-product]',
+            'a[data-item]',
+            '[class*="product-card"] a',
+            '[class*="product-tile"] a',
+            '[class*="product-item"] a',
+            '[class*="ProductCard"] a',
+            'article a[href*="/p/"]',
+            'article a[href*="/product"]',
+            '.products-grid a',
+            '.product-list a',
+        ]
+
+        for selector in product_link_selectors:
+            try:
+                for link in soup.select(selector):
+                    href = link.get('href', '')
+                    if href and not href.startswith('#') and not href.startswith('javascript'):
+                        # Filter for likely product URLs
+                        if any(pattern in href.lower() for pattern in ['/p/', '/product', '/item', '-p-', '/products/']):
+                            product_links.add(urljoin(url, href))
+                        elif re.search(r'/[a-z0-9-]+-p\d+', href, re.I):  # Pattern like /product-name-p12345
+                            product_links.add(urljoin(url, href))
+            except:
+                continue
+
+        # Pattern 2: Links within product grid/list containers
+        grid_containers = soup.find_all(['div', 'ul', 'section'], class_=re.compile(r'product|grid|listing|results', re.I))
+        for container in grid_containers:
+            for link in container.find_all('a', href=True):
+                href = link.get('href', '')
+                if href and len(href) > 10 and not href.startswith('#'):
+                    # Check if it looks like a product URL (not category/filter)
+                    if not any(skip in href.lower() for skip in ['filter', 'sort', 'page=', 'category', '#', 'javascript', 'login', 'cart', 'wishlist']):
+                        full_url = urljoin(url, href)
+                        if full_url != url and full_url.startswith('http'):
+                            product_links.add(full_url)
+
+        if product_links:
+            logger.info(f"[DIRECT EXTRACTION] Found {len(product_links)} potential product links directly from HTML")
 
         # Strategy 1: Look for embedded JSON product data (common in modern e-commerce)
         # Many sites embed product data in script tags for SEO or client-side rendering
@@ -521,12 +810,12 @@ If you cannot find certain fields, use null for that field."""
         # Strategy 2: Extract just the main content area (skip header/nav/footer)
         main_content = ""
 
-        # Try to find main product area
-        product_containers = soup.find_all(['main', 'div'], class_=re.compile(r'product|catalog|listing|grid|items', re.I))
+        # Try to find main product area - get ALL product containers
+        product_containers = soup.find_all(['main', 'div', 'ul', 'section'], class_=re.compile(r'product|catalog|listing|grid|items|results', re.I))
         if product_containers:
-            for container in product_containers[:3]:  # Take first few matching containers
+            for container in product_containers:  # Get ALL matching containers
                 main_content += str(container)
-            logger.info(f"Extracted {len(main_content)} chars from product containers")
+            logger.info(f"Extracted {len(main_content)} chars from {len(product_containers)} product containers")
 
         # If no product containers found, try to get body content minus scripts/styles
         if len(main_content) < 5000:
@@ -538,21 +827,21 @@ If you cannot find certain fields, use null for that field."""
                 main_content = str(body)
                 logger.info(f"Using cleaned body content: {len(main_content)} chars")
 
-        # Strategy 3: Send more content to Claude (increased from 30k to 80k chars)
+        # Strategy 3: Send more content to Claude (increased to 150k chars for 60-120 products)
         # Take content from multiple positions to catch products
         content_for_claude = ""
 
         if main_content and len(main_content) > 1000:
-            # Use the extracted main content
-            content_for_claude = main_content[:80000]
+            # Use the extracted main content - increased limit for more products
+            content_for_claude = main_content[:150000]
         else:
             # Fallback: take beginning, middle and end of HTML
             total_len = len(html_content)
-            content_for_claude = html_content[:40000]  # First 40k
-            if total_len > 80000:
+            content_for_claude = html_content[:60000]  # First 60k
+            if total_len > 120000:
                 # Add middle section
-                mid_start = (total_len // 2) - 20000
-                content_for_claude += "\n... [MIDDLE SECTION] ...\n" + html_content[mid_start:mid_start + 40000]
+                mid_start = (total_len // 2) - 30000
+                content_for_claude += "\n... [MIDDLE SECTION] ...\n" + html_content[mid_start:mid_start + 60000]
 
         logger.info(f"Sending {len(content_for_claude)} chars to Claude for product parsing")
 
@@ -561,7 +850,7 @@ If you cannot find certain fields, use null for that field."""
 
 URL: {url}
 
-Extract as many products as you can find (aim for at least 20-35 products if available), including:
+Extract as many products as you can find (aim for at least 60-120 products if available), including:
 - Product name
 - Price (if available, convert to numeric format)
 - Brief description (if available)
@@ -593,13 +882,13 @@ IMPORTANT: Return ONLY valid JSON, no other text. Format:
 }}
 
 The URL field is critical - extract the href link to each product's detail page.
-Extract as many products as possible (up to 35). If you find fewer, extract all you can find.
+Extract as many products as possible (up to 120). If you find fewer, extract all you can find.
 If you can't find specific products, return {{"products": [], "explanation": "reason"}}"""
 
         try:
             response = self.anthropic.messages.create(
                 model="claude-sonnet-4-5-20250929",
-                max_tokens=8000,
+                max_tokens=16000,  # Increased for 60-120 products
                 temperature=0.3,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -620,19 +909,49 @@ If you can't find specific products, return {{"products": [], "explanation": "re
 
             if products:
                 logger.info(f"Successfully parsed {len(products)} products from {url}")
+
+                # If we didn't get enough products, supplement with directly extracted links
+                if len(products) < 60 and product_links:
+                    existing_urls = {p.get('url', '').rstrip('/') for p in products if p.get('url')}
+                    for link in product_links:
+                        if link.rstrip('/') not in existing_urls and len(products) < 120:
+                            products.append({
+                                'name': '',  # Will be filled by deep scraper
+                                'price': None,
+                                'url': link,
+                                'description': '',
+                                'features': []
+                            })
+                            existing_urls.add(link.rstrip('/'))
+                    logger.info(f"Supplemented with direct links: now {len(products)} products")
+
                 return products
             else:
                 explanation = data.get("explanation", "No explanation provided")
-                logger.warning(f"No products found: {explanation}")
+                logger.warning(f"No products found via Claude: {explanation}")
+
+                # Use directly extracted links as fallback
+                if product_links:
+                    logger.info(f"Using {len(product_links)} directly extracted links as fallback")
+                    return [{'name': '', 'price': None, 'url': link, 'description': '', 'features': []} for link in list(product_links)[:120]]
+
                 # Fall back to mock data if no products found
                 return self._get_mock_products()
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON from Claude response: {e}")
             logger.debug(f"Response was: {response_text[:500]}")
+            # Use directly extracted links as fallback
+            if product_links:
+                logger.info(f"Using {len(product_links)} directly extracted links after JSON error")
+                return [{'name': '', 'price': None, 'url': link, 'description': '', 'features': []} for link in list(product_links)[:120]]
             return self._get_mock_products()
         except Exception as e:
             logger.error(f"Error parsing products: {e}", exc_info=True)
+            # Use directly extracted links as fallback
+            if product_links:
+                logger.info(f"Using {len(product_links)} directly extracted links after error")
+                return [{'name': '', 'price': None, 'url': link, 'description': '', 'features': []} for link in list(product_links)[:120]]
             return self._get_mock_products()
 
     def _extract_from_embedded_data(self, data_list: List) -> List[Dict]:
@@ -921,6 +1240,157 @@ Format as a clear list."""
                 f"{category_name} for kids"
             ]
         }
+
+    def _generate_content_ideas(self, products: List[Dict], category_insights: Dict, parent_questions: List[str]) -> List[Dict]:
+        """
+        Generate contextual content/article ideas based on products and category.
+
+        Uses Claude to brainstorm practical, helpful content ideas that would
+        resonate with parents shopping for these products.
+
+        Args:
+            products: List of product data
+            category_insights: Category analysis
+            parent_questions: Common parent questions
+
+        Returns:
+            List of content idea dictionaries with title, intro, type, and metadata
+        """
+        category_name = category_insights.get("category_name", "children's products")
+        price_range = category_insights.get("price_range", {})
+        common_features = category_insights.get("common_features", [])
+
+        # Extract age ranges from products
+        age_indicators = []
+        for product in products[:30]:
+            name = product.get("name", "").lower()
+            desc = product.get("description", "").lower()
+            combined = f"{name} {desc}"
+
+            if any(term in combined for term in ["newborn", "0-3m", "0-3 month"]):
+                age_indicators.append("newborn")
+            if any(term in combined for term in ["baby", "infant", "3-6m", "6-9m", "9-12m"]):
+                age_indicators.append("baby")
+            if any(term in combined for term in ["toddler", "12-18m", "18-24m", "2-3y"]):
+                age_indicators.append("toddler")
+            if any(term in combined for term in ["kids", "child", "3-4y", "4-5y", "5-6y"]):
+                age_indicators.append("kids")
+
+        # Determine primary age group
+        from collections import Counter
+        age_counts = Counter(age_indicators)
+        primary_age = age_counts.most_common(1)[0][0] if age_counts else "baby"
+
+        # Extract product types/themes
+        product_names = [p.get("name", "") for p in products[:20]]
+        product_features = []
+        for p in products[:20]:
+            product_features.extend(p.get("features", []))
+
+        prompt = f"""You are a content strategist for a premium children's clothing retailer.
+
+Based on this product category, generate 3 highly practical and helpful article/content ideas that would genuinely help parents.
+
+CATEGORY: {category_name}
+PRIMARY AGE GROUP: {primary_age}
+PRICE RANGE: £{price_range.get('min', 0):.0f} - £{price_range.get('max', 0):.0f}
+SAMPLE PRODUCTS: {', '.join(product_names[:10])}
+COMMON FEATURES: {', '.join([str(f) for f in common_features[:8]])}
+PARENT QUESTIONS: {', '.join([q.get('question', str(q)) if isinstance(q, dict) else str(q) for q in parent_questions[:5]]) if parent_questions else 'General buying advice'}
+
+IMPORTANT GUIDELINES:
+1. Focus on PRACTICAL, REAL-WORLD USEFUL content that helps parents make decisions
+2. Consider safety, comfort, age-appropriateness, and seasonal factors
+3. Include specific, actionable advice (e.g., temperature guidelines, sizing tips, care instructions)
+4. Mix content types: buying guides, how-to guides, educational content
+5. Make titles compelling and SEO-friendly
+6. The intro should hook readers and preview the value they'll get
+
+EXAMPLES of good content angles:
+- For nightwear: "What temperature should my baby's room be? Sleep layering guide by age"
+- For swimwear: "UV protection guide: How to keep babies safe in the sun"
+- For coats: "How to layer children's clothing for cold weather without overheating"
+- For shoes: "When should babies start wearing shoes? A podiatrist's guide"
+
+Return ONLY valid JSON:
+{{
+  "content_ideas": [
+    {{
+      "id": "idea_1",
+      "title": "Compelling SEO-friendly title",
+      "intro": "2-3 sentence introduction that hooks the reader and previews the article's value (60-100 words)",
+      "type": "buying_guide" | "how_to" | "educational" | "seasonal",
+      "target_audience": "e.g., First-time parents, Parents of newborns",
+      "key_topics": ["topic1", "topic2", "topic3"],
+      "seo_keywords": ["keyword1", "keyword2"],
+      "estimated_word_count": 1200,
+      "why_this_matters": "Brief explanation of why this content would resonate with parents"
+    }}
+  ]
+}}"""
+
+        try:
+            response = self.anthropic.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=3000,
+                temperature=0.7,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            import json
+            response_text = response.content[0].text.strip()
+
+            # Clean markdown if present
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            data = json.loads(response_text)
+            content_ideas = data.get("content_ideas", [])
+
+            logger.info(f"Generated {len(content_ideas)} content ideas for {category_name}")
+            return content_ideas
+
+        except Exception as e:
+            logger.error(f"Error generating content ideas: {e}", exc_info=True)
+            # Return fallback ideas
+            return [
+                {
+                    "id": "idea_1",
+                    "title": f"The Complete Guide to Choosing {category_name}",
+                    "intro": f"Shopping for {category_name} can be overwhelming with so many options available. In this comprehensive guide, we'll help you understand what to look for, from materials and sizing to safety features and value for money.",
+                    "type": "buying_guide",
+                    "target_audience": "Parents shopping for " + primary_age + "s",
+                    "key_topics": ["Materials", "Sizing", "Safety", "Value"],
+                    "seo_keywords": [category_name.lower(), f"best {category_name}"],
+                    "estimated_word_count": 1200,
+                    "why_this_matters": "Parents need practical guidance to make informed purchasing decisions"
+                },
+                {
+                    "id": "idea_2",
+                    "title": f"How to Care for Your Child's {category_name}: Tips from the Experts",
+                    "intro": f"Proper care extends the life of your child's {category_name} and keeps them looking their best. Learn the washing, drying, and storage techniques that professionals recommend.",
+                    "type": "how_to",
+                    "target_audience": "All parents",
+                    "key_topics": ["Washing", "Drying", "Storage", "Stain removal"],
+                    "seo_keywords": [f"how to wash {category_name}", f"{category_name} care"],
+                    "estimated_word_count": 800,
+                    "why_this_matters": "Helps parents get more value from their purchases"
+                },
+                {
+                    "id": "idea_3",
+                    "title": f"Seasonal {category_name} Essentials: What Your Child Needs",
+                    "intro": f"As the seasons change, so do your child's {category_name} needs. Discover what essentials to have ready for each season and how to transition your child's wardrobe smoothly.",
+                    "type": "seasonal",
+                    "target_audience": "Parents planning ahead",
+                    "key_topics": ["Seasonal needs", "Layering", "Planning", "Essentials"],
+                    "seo_keywords": [f"seasonal {category_name}", f"{category_name} essentials"],
+                    "estimated_word_count": 1000,
+                    "why_this_matters": "Helps parents plan and budget for their children's needs"
+                }
+            ]
 
     def _get_mock_products(self) -> List[Dict]:
         """Get mock product data for testing (expanded to 20+ products)."""

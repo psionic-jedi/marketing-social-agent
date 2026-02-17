@@ -88,6 +88,22 @@ export const campaignService = {
   async deleteCampaign(id: string): Promise<void> {
     await api.delete(`/api/campaigns/${id}`);
   },
+
+  /**
+   * Generate a full article from a content idea
+   */
+  async generateArticle(campaignId: string, contentIdea: {
+    content_idea_id: string;
+    title: string;
+    intro: string;
+    type: string;
+    key_topics: string[];
+    target_audience: string;
+    seo_keywords?: string[];
+  }): Promise<any> {
+    const response = await api.post(`/api/campaigns/${campaignId}/generate-article`, contentIdea);
+    return response.data;
+  },
 };
 
 export default api;

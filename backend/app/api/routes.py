@@ -3,7 +3,8 @@ API routes for the marketing agent system.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 import uuid
 import logging
 
@@ -11,10 +12,23 @@ from app.core.database import get_db_session
 from app.models.database import Campaign, CampaignStatus, CampaignResult
 from app.schemas.campaign import CampaignCreate, CampaignResponse
 from app.services.campaign_service import CampaignService
+from app.services.article_generator import ArticleGenerator
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 campaign_service = CampaignService()
+article_generator = ArticleGenerator()
+
+
+class ArticleGenerateRequest(BaseModel):
+    """Request body for article generation."""
+    content_idea_id: str
+    title: str
+    intro: str
+    type: str
+    key_topics: List[str]
+    target_audience: str
+    seo_keywords: Optional[List[str]] = None
 
 
 @router.post("/campaigns", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)
@@ -176,3 +190,64 @@ async def get_campaign_results(
             "analyst_insights": results.analyst_insights
         }
     }
+
+
+@router.post("/campaigns/{campaign_id}/generate-article")
+async def generate_article(
+    campaign_id: uuid.UUID,
+    request: ArticleGenerateRequest,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Generate a full article based on a content idea.
+
+    Takes a content idea from the research phase and generates a complete
+    SEO-optimized article with meta description, headers, and full body content.
+    """
+    logger.info(f"Generating article for campaign {campaign_id}, idea: {request.content_idea_id}")
+
+    # Verify campaign exists
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Campaign {campaign_id} not found"
+        )
+
+    # Get campaign results for context
+    results = db.query(CampaignResult).filter(
+        CampaignResult.campaign_id == campaign_id
+    ).first()
+
+    if not results or not results.research_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Campaign has no research data to base article on"
+        )
+
+    # Generate the article
+    try:
+        article = await article_generator.generate_full_article(
+            title=request.title,
+            intro=request.intro,
+            article_type=request.type,
+            key_topics=request.key_topics,
+            target_audience=request.target_audience,
+            seo_keywords=request.seo_keywords or [],
+            category_name=results.research_data.get("category_insights", {}).get("category_name", ""),
+            products=results.research_data.get("products", [])[:10]
+        )
+
+        logger.info(f"Article generated successfully for campaign {campaign_id}")
+        return {
+            "success": True,
+            "content_idea_id": request.content_idea_id,
+            "article": article
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating article: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate article: {str(e)}"
+        )

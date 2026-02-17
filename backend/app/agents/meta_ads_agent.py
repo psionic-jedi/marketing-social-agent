@@ -818,7 +818,7 @@ Respond in this exact JSON format:
     def _get_placement_recommendations(self, demographics: Dict) -> Dict:
         """Get placement recommendations based on demographics."""
         return {
-            "recommended_approach": "Advantage+ Placements (let Meta optimize)",
+            "recommended_approach": "Advantage+ Placements (let Meta optimise)",
             "manual_placement_notes": {
                 "Facebook Feed": {
                     "priority": "High",
@@ -860,7 +860,7 @@ Respond in this exact JSON format:
             "Set up Meta Pixel with all standard events (ViewContent, AddToCart, Purchase)",
             "Create a product catalog for dynamic retargeting ads",
             "Test 3-5 ad creatives per ad set before scaling",
-            "Use Campaign Budget Optimization (CBO) for efficient spend allocation",
+            "Use Campaign Budget Optimisation (CBO) for efficient spend allocation",
             "Set up custom conversions for category-specific tracking",
             "Implement the Conversions API (CAPI) for improved tracking accuracy",
             "Use broad targeting and let Meta's algorithm find the right audience",
