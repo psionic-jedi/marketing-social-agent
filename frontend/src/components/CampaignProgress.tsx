@@ -7,12 +7,41 @@ interface CampaignProgressProps {
   onComplete: () => void;
 }
 
+// Map research sub-steps to human-readable descriptions
+function getResearchSubStepDescription(currentStep: string): string {
+  if (!currentStep) return 'Starting research...';
+
+  if (currentStep.includes('scraping_page')) return 'Scraping category page...';
+  if (currentStep.includes('parsing_products')) return 'Parsing product listings...';
+  if (currentStep.includes('pagination')) {
+    const match = currentStep.match(/\((.+?)\)/);
+    return match ? `Searching for more products (${match[1]})...` : 'Paginating for more products...';
+  }
+  if (currentStep.includes('deep_scraping')) {
+    const match = currentStep.match(/\((\d+)\/(\d+)\)/);
+    if (match) return `Deep scraping product ${match[1]} of ${match[2]}...`;
+    return 'Deep scraping product pages...';
+  }
+  if (currentStep.includes('analysing_products')) return 'Analysing products with AI...';
+  if (currentStep.includes('parent_questions')) return 'Researching common parent questions...';
+  if (currentStep.includes('seo_research')) return 'Conducting SEO keyword research...';
+  if (currentStep.includes('content_ideas')) return 'Brainstorming content ideas...';
+
+  return 'Analysing category and products...';
+}
+
+// Get the main step from current_step (e.g., 'research:deep_scraping (3/45)' -> 'research')
+function getMainStep(currentStep: string | null): string {
+  if (!currentStep) return '';
+  return currentStep.split(':')[0];
+}
+
 const AGENT_STEPS = [
-  { key: 'research', name: 'Research Agent', description: 'Analyzing category and products' },
-  { key: 'deep_scraping', name: 'Deep Product Scraping', description: 'Visiting product pages for detailed info', isSubStep: true },
+  { key: 'research', name: 'Research Agent', description: 'Analysing category and products' },
   { key: 'content', name: 'Content Agent', description: 'Generating marketing copy' },
   { key: 'social_media', name: 'Social Media Agent', description: 'Creating social media strategy' },
   { key: 'ppc', name: 'PPC Agent', description: 'Building Google Ads campaign' },
+  { key: 'meta_ads', name: 'Meta Ads Agent', description: 'Creating Facebook & Instagram ads' },
   { key: 'crm', name: 'CRM Agent', description: 'Designing email campaigns' },
   { key: 'analyst', name: 'Analyst Agent', description: 'Generating insights and recommendations' },
 ];
@@ -63,9 +92,16 @@ const CampaignProgress: React.FC<CampaignProgressProps> = ({ campaignId, onCompl
     );
   }
 
-  const currentStepIndex = campaign.current_step
-    ? AGENT_STEPS.findIndex(step => campaign.current_step?.includes(step.key))
+  const mainStep = getMainStep(campaign.current_step);
+  const currentStepIndex = mainStep
+    ? AGENT_STEPS.findIndex(step => mainStep.includes(step.key))
     : -1;
+
+  // Get deep scraping progress for sub-progress bar
+  const deepScrapingMatch = campaign.current_step?.match(/deep_scraping \((\d+)\/(\d+)\)/);
+  const deepScrapingCurrent = deepScrapingMatch ? parseInt(deepScrapingMatch[1]) : 0;
+  const deepScrapingTotal = deepScrapingMatch ? parseInt(deepScrapingMatch[2]) : 0;
+  const deepScrapingPercent = deepScrapingTotal > 0 ? (deepScrapingCurrent / deepScrapingTotal) * 100 : 0;
 
   return (
     <div className="progress-container">
@@ -76,7 +112,7 @@ const CampaignProgress: React.FC<CampaignProgressProps> = ({ campaignId, onCompl
             {campaign.status}
           </span>
           <span className="progress-percent">
-            {campaign.progress_percentage || 0}%
+            {Number(campaign.progress_percentage || 0).toFixed(0)}%
           </span>
         </div>
       </div>
@@ -88,26 +124,35 @@ const CampaignProgress: React.FC<CampaignProgressProps> = ({ campaignId, onCompl
         />
       </div>
 
+      {/* Live activity indicator */}
+      {campaign.status === 'running' && campaign.current_step && (
+        <div className="live-activity">
+          <div className="live-dot"></div>
+          <span className="live-text">
+            {campaign.current_step.includes('research:')
+              ? getResearchSubStepDescription(campaign.current_step)
+              : AGENT_STEPS.find(s => mainStep.includes(s.key))?.description || campaign.current_step
+            }
+          </span>
+        </div>
+      )}
+
       <div className="agents-list">
         {AGENT_STEPS.map((agent, index) => {
           const isCompleted = index < currentStepIndex || campaign.status === 'completed';
           const isCurrent = index === currentStepIndex && campaign.status === 'running';
           const isPending = index > currentStepIndex;
-          const isSubStep = (agent as any).isSubStep;
 
-          // Get dynamic description for deep scraping (shows "Scraping product 5/35")
+          // Dynamic description for current research step
           let description = agent.description;
-          if (agent.key === 'deep_scraping' && isCurrent && campaign.current_step) {
-            const match = campaign.current_step.match(/\((\d+)\/(\d+)\)/);
-            if (match) {
-              description = `Scraping product ${match[1]} of ${match[2]} for full details`;
-            }
+          if (agent.key === 'research' && isCurrent && campaign.current_step) {
+            description = getResearchSubStepDescription(campaign.current_step);
           }
 
           return (
             <div
               key={agent.key}
-              className={`agent-step ${isCompleted ? 'completed' : ''} ${isCurrent ? 'active' : ''} ${isPending ? 'pending' : ''} ${isSubStep ? 'sub-step' : ''}`}
+              className={`agent-step ${isCompleted ? 'completed' : ''} ${isCurrent ? 'active' : ''} ${isPending ? 'pending' : ''}`}
             >
               <div className="agent-step-icon">
                 {isCompleted ? (
@@ -118,12 +163,27 @@ const CampaignProgress: React.FC<CampaignProgressProps> = ({ campaignId, onCompl
                 ) : isCurrent ? (
                   <div className="spinner-small"></div>
                 ) : (
-                  <div className="step-number">{isSubStep ? '↳' : index}</div>
+                  <div className="step-number">{index + 1}</div>
                 )}
               </div>
               <div className="agent-step-content">
                 <div className="agent-step-name">{agent.name}</div>
                 <div className="agent-step-description">{description}</div>
+
+                {/* Sub-progress bar for deep scraping */}
+                {agent.key === 'research' && isCurrent && deepScrapingTotal > 0 && (
+                  <div className="sub-progress">
+                    <div className="sub-progress-bar">
+                      <div
+                        className="sub-progress-fill"
+                        style={{ width: `${deepScrapingPercent}%` }}
+                      />
+                    </div>
+                    <span className="sub-progress-text">
+                      {deepScrapingCurrent}/{deepScrapingTotal} products
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           );

@@ -58,6 +58,29 @@ services:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  # Celery Worker (Task Queue)
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: marketing-agent-celery
+    environment:
+      - DATABASE_URL=postgresql://marketing_user:marketing_pass@postgres:5432/marketing_agents
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_TYPE=local
+      - LOCAL_STORAGE_PATH=/app/storage
+      - DEBUG=true
+      - ENVIRONMENT=development
+    volumes:
+      - ./backend:/app
+      - backend_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=2
+
   # Frontend (React)
   frontend:
     build:

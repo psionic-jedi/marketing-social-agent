@@ -1,7 +1,7 @@
 """
 API routes for the marketing agent system.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
@@ -9,14 +9,13 @@ import uuid
 import logging
 
 from app.core.database import get_db_session
-from app.models.database import Campaign, CampaignStatus, CampaignResult
+from app.models.database import Campaign, CampaignStatus, CampaignResult, GeneratedArticle
 from app.schemas.campaign import CampaignCreate, CampaignResponse
-from app.services.campaign_service import CampaignService
 from app.services.article_generator import ArticleGenerator
+from app.tasks.campaign_tasks import execute_campaign_task
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-campaign_service = CampaignService()
 article_generator = ArticleGenerator()
 
 
@@ -34,15 +33,14 @@ class ArticleGenerateRequest(BaseModel):
 @router.post("/campaigns", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)
 async def create_campaign(
     campaign_data: CampaignCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db_session)
 ):
     """
     Create a new marketing campaign.
 
     This endpoint accepts a category URL and optional parameters,
-    then initiates the multi-agent workflow to generate a complete
-    marketing campaign in the background.
+    then initiates the multi-agent workflow via Celery task queue.
+    Tasks survive laptop sleep, restarts, and network interruptions.
     """
     logger.info(f"Creating new campaign for URL: {campaign_data.category_url}")
 
@@ -59,32 +57,14 @@ async def create_campaign(
     db.commit()
     db.refresh(campaign)
 
-    logger.info(f"Campaign {campaign.id} created, triggering workflow")
+    logger.info(f"Campaign {campaign.id} created, queuing Celery task")
 
-    # Trigger workflow execution in background
-    background_tasks.add_task(
-        execute_campaign_workflow,
-        campaign.id,
-        db
-    )
+    # Queue the campaign execution task in Celery
+    # This task is persisted in Redis and survives restarts
+    task = execute_campaign_task.delay(str(campaign.id))
+    logger.info(f"Campaign {campaign.id} queued as Celery task {task.id}")
 
     return campaign
-
-
-async def execute_campaign_workflow(campaign_id: uuid.UUID, db: Session):
-    """
-    Background task to execute the campaign workflow.
-
-    Args:
-        campaign_id: ID of the campaign to execute
-        db: Database session
-    """
-    try:
-        logger.info(f"Background task: Executing campaign {campaign_id}")
-        await campaign_service.execute_campaign(campaign_id, db)
-        logger.info(f"Background task: Campaign {campaign_id} execution completed")
-    except Exception as e:
-        logger.error(f"Background task: Campaign {campaign_id} failed: {e}", exc_info=True)
 
 
 @router.get("/campaigns", response_model=List[CampaignResponse])
@@ -238,7 +218,26 @@ async def generate_article(
             products=results.research_data.get("products", [])[:10]
         )
 
-        logger.info(f"Article generated successfully for campaign {campaign_id}")
+        # Save to database (upsert - replace if same content_idea_id exists)
+        existing = db.query(GeneratedArticle).filter(
+            GeneratedArticle.campaign_id == campaign_id,
+            GeneratedArticle.content_idea_id == request.content_idea_id
+        ).first()
+
+        if existing:
+            existing.article_data = article
+            existing.created_at = __import__('datetime').datetime.utcnow()
+        else:
+            generated = GeneratedArticle(
+                campaign_id=campaign_id,
+                content_idea_id=request.content_idea_id,
+                article_data=article
+            )
+            db.add(generated)
+
+        db.commit()
+
+        logger.info(f"Article generated and saved for campaign {campaign_id}")
         return {
             "success": True,
             "content_idea_id": request.content_idea_id,
@@ -247,7 +246,37 @@ async def generate_article(
 
     except Exception as e:
         logger.error(f"Error generating article: {e}", exc_info=True)
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate article: {str(e)}"
         )
+
+
+@router.get("/campaigns/{campaign_id}/articles")
+async def get_campaign_articles(
+    campaign_id: uuid.UUID,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Get all generated articles for a campaign.
+    Returns a dict keyed by content_idea_id for easy lookup.
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Campaign {campaign_id} not found"
+        )
+
+    articles = db.query(GeneratedArticle).filter(
+        GeneratedArticle.campaign_id == campaign_id
+    ).all()
+
+    return {
+        a.content_idea_id: {
+            "article": a.article_data,
+            "created_at": a.created_at.isoformat() if a.created_at else None
+        }
+        for a in articles
+    }

@@ -36,7 +36,7 @@ class OverlordAgent:
     """
 
     def __init__(self, progress_callback=None):
-        self.research_agent = ResearchAgent()
+        self.research_agent = ResearchAgent(progress_callback=progress_callback)
         self.content_agent = ContentAgent()
         self.social_media_agent = SocialMediaAgent()
         self.ppc_agent = PPCAgent()

@@ -23,13 +23,22 @@ logger = logging.getLogger(__name__)
 class ResearchAgent:
     """Research agent for gathering product and market intelligence."""
 
-    def __init__(self, use_mock_data: bool = None):
+    def __init__(self, use_mock_data: bool = None, progress_callback=None):
         self.anthropic = Anthropic(api_key=settings.anthropic_api_key)
+        self.progress_callback = progress_callback
         # Use config setting if not explicitly provided
         if use_mock_data is None:
             self.use_mock_data = not settings.use_real_scraping
         else:
             self.use_mock_data = use_mock_data
+
+    def _update_progress(self, campaign_id: str, step: str, percentage: float):
+        """Update progress via callback if available."""
+        if self.progress_callback:
+            try:
+                self.progress_callback(campaign_id, step, percentage)
+            except Exception as e:
+                logger.warning(f"Failed to update progress: {e}")
 
     async def execute(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
@@ -45,6 +54,7 @@ class ResearchAgent:
 
         state["current_step"] = "research"
         state["progress_percentage"] = 10
+        campaign_id = state['campaign_id']
 
         try:
             # Use mock data in development or if scraping fails
@@ -55,6 +65,7 @@ class ResearchAgent:
             else:
                 # Step 1: Scrape category page(s) with pagination support
                 logger.info(f"Scraping category page: {state['category_url']}")
+                self._update_progress(campaign_id, 'research:scraping_page', 5)
                 all_products = []
                 all_html_content = ""
                 target_min_products = 60
@@ -66,6 +77,7 @@ class ResearchAgent:
 
                     # Parse products from first page
                     logger.info("Parsing product data from listing page")
+                    self._update_progress(campaign_id, 'research:parsing_products', 8)
                     products = self._parse_products(html_content, state["category_url"])
                     all_products.extend(products)
                     logger.info(f"Found {len(products)} products on page 1")
@@ -73,6 +85,7 @@ class ResearchAgent:
                     # If we don't have enough products, try pagination
                     if len(all_products) < target_min_products:
                         logger.info(f"Only found {len(all_products)} products, attempting pagination...")
+                        self._update_progress(campaign_id, f'research:pagination ({len(all_products)} products found)', 10)
                         paginated_products = await self._scrape_paginated_products(
                             state["category_url"],
                             existing_products=all_products,
@@ -103,13 +116,15 @@ class ResearchAgent:
                         # Update state to show deep scraping phase
                         state["current_step"] = "deep_scraping"
                         state["progress_percentage"] = 12
+                        self._update_progress(campaign_id, f'research:deep_scraping (0/{len(product_urls)})', 12)
 
                         detailed_products = await self._scrape_product_details(
                             product_urls,
                             state["category_url"],
                             max_products=120,
                             min_products=60,
-                            state=state  # Pass state for progress updates
+                            state=state,  # Pass state for progress updates
+                            campaign_id=campaign_id  # Pass campaign_id for progress callback
                         )
 
                         # Merge detailed data with listing data
@@ -122,24 +137,28 @@ class ResearchAgent:
                     else:
                         logger.warning("No product URLs found, skipping deep scrape")
 
-                    # Step 4: Analyze with Claude to extract insights
-                    logger.info("Analyzing products with Claude")
+                    # Step 4: Analyse with Claude to extract insights
+                    logger.info("Analysing products with Claude")
+                    self._update_progress(campaign_id, 'research:analysing_products', 22)
                     category_insights = self._analyze_category(products, all_html_content if all_html_content else html_content)
 
             # Step 4: Research parent questions
             logger.info("Researching parent questions")
+            self._update_progress(campaign_id, 'research:parent_questions', 25)
             parent_questions = self._research_parent_questions(
                 category_insights.get("category_name", "children's products")
             )
 
             # Step 5: SEO keyword research
             logger.info("Conducting SEO research")
+            self._update_progress(campaign_id, 'research:seo_research', 27)
             seo_keywords = self._research_seo_keywords(
                 category_insights.get("category_name", "")
             )
 
             # Step 6: Generate content/article ideas
             logger.info("Generating content ideas")
+            self._update_progress(campaign_id, 'research:content_ideas', 28)
             content_ideas = self._generate_content_ideas(
                 products=products,
                 category_insights=category_insights,
@@ -479,7 +498,7 @@ class ResearchAgent:
 
         return urls
 
-    async def _scrape_product_details(self, product_urls: List[str], base_url: str, max_products: int = 120, min_products: int = 60, state: Dict = None) -> List[Dict]:
+    async def _scrape_product_details(self, product_urls: List[str], base_url: str, max_products: int = 120, min_products: int = 60, state: Dict = None, campaign_id: str = None) -> List[Dict]:
         """
         Scrape individual product detail pages to get full descriptions.
 
@@ -526,11 +545,13 @@ class ResearchAgent:
 
                 for i, url in enumerate(urls_to_scrape):
                     try:
-                        # Update progress (deep scraping runs from 12% to 25% of total)
+                        # Update progress (deep scraping runs from 12% to 22% of total)
+                        progress = 12 + (10 * (i / total_products))  # 12% to 22%
                         if state:
-                            progress = 12 + (13 * (i / total_products))  # 12% to 25%
                             state["progress_percentage"] = round(progress, 1)
                             state["current_step"] = f"deep_scraping ({i+1}/{total_products})"
+                        if campaign_id:
+                            self._update_progress(campaign_id, f'research:deep_scraping ({i+1}/{total_products})', round(progress, 1))
 
                         # Resolve relative URLs
                         full_url = urljoin(base_url, url)

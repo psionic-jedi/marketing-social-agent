@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CampaignResults as CampaignResultsType, campaignService } from '../services/api';
 import './CampaignResults.css';
 
@@ -42,8 +42,31 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set(['primary-headlines', 'instagram', 'high-intent', 'core-audiences', 'welcome-series']));
   const [generatingArticle, setGeneratingArticle] = useState<string | null>(null);
-  const [generatedArticle, setGeneratedArticle] = useState<GeneratedArticle | null>(null);
+  const [generatedArticles, setGeneratedArticles] = useState<Record<string, GeneratedArticle>>({});
+  const [viewingArticleId, setViewingArticleId] = useState<string | null>(null);
   const [articleError, setArticleError] = useState<string | null>(null);
+
+  // Load saved articles from the database on mount
+  useEffect(() => {
+    const loadSavedArticles = async () => {
+      try {
+        const saved = await campaignService.getArticles(results.campaign_id);
+        if (saved && Object.keys(saved).length > 0) {
+          const articlesMap: Record<string, GeneratedArticle> = {};
+          for (const [ideaId, data] of Object.entries(saved)) {
+            articlesMap[ideaId] = data.article;
+          }
+          setGeneratedArticles(articlesMap);
+        }
+      } catch (error) {
+        console.error('Error loading saved articles:', error);
+      }
+    };
+
+    if (results.campaign_id) {
+      loadSavedArticles();
+    }
+  }, [results.campaign_id]);
 
   const handleGenerateArticle = async (idea: any) => {
     setGeneratingArticle(idea.id);
@@ -61,7 +84,8 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
       });
 
       if (response.success && response.article) {
-        setGeneratedArticle(response.article);
+        setGeneratedArticles(prev => ({ ...prev, [idea.id]: response.article }));
+        setViewingArticleId(idea.id);
       } else {
         setArticleError('Failed to generate article');
       }
@@ -72,6 +96,9 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
       setGeneratingArticle(null);
     }
   };
+
+  // Get currently viewing article
+  const generatedArticle = viewingArticleId ? generatedArticles[viewingArticleId] : null;
 
   if (!results.results) {
     return (
@@ -382,23 +409,39 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
                           )}
                           <div className="idea-footer">
                             <span className="word-count">~{idea.estimated_word_count || 1200} words</span>
-                            <button
-                              className={`generate-btn ${generatingArticle === idea.id ? 'loading' : ''}`}
-                              onClick={() => handleGenerateArticle(idea)}
-                              disabled={generatingArticle !== null}
-                            >
-                              {generatingArticle === idea.id ? (
-                                <>
-                                  <span className="spinner"></span>
-                                  Generating...
-                                </>
-                              ) : (
-                                <>
-                                  <span>✨</span>
-                                  Generate Article
-                                </>
+                            <div className="idea-actions">
+                              {generatedArticles[idea.id] && (
+                                <button
+                                  className="view-article-btn"
+                                  onClick={() => setViewingArticleId(idea.id)}
+                                >
+                                  <span>📄</span>
+                                  View Article
+                                </button>
                               )}
-                            </button>
+                              <button
+                                className={`generate-btn ${generatingArticle === idea.id ? 'loading' : ''}`}
+                                onClick={() => handleGenerateArticle(idea)}
+                                disabled={generatingArticle !== null}
+                              >
+                                {generatingArticle === idea.id ? (
+                                  <>
+                                    <span className="spinner"></span>
+                                    Generating...
+                                  </>
+                                ) : generatedArticles[idea.id] ? (
+                                  <>
+                                    <span>🔄</span>
+                                    Regenerate
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>✨</span>
+                                    Generate Article
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1194,11 +1237,11 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
 
       {/* Generated Article Modal */}
       {generatedArticle && (
-        <div className="modal-overlay-v2 article-modal" onClick={() => setGeneratedArticle(null)}>
+        <div className="modal-overlay-v2 article-modal" onClick={() => setViewingArticleId(null)}>
           <div className="modal-content-v2 article-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header-v2">
               <h3>📝 Generated Article</h3>
-              <button className="close-btn-v2" onClick={() => setGeneratedArticle(null)}>✕</button>
+              <button className="close-btn-v2" onClick={() => setViewingArticleId(null)}>✕</button>
             </div>
             <div className="modal-body-v2 article-body">
               {/* Meta Section */}

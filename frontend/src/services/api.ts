@@ -104,6 +104,14 @@ export const campaignService = {
     const response = await api.post(`/api/campaigns/${campaignId}/generate-article`, contentIdea);
     return response.data;
   },
+
+  /**
+   * Get all saved articles for a campaign
+   */
+  async getArticles(campaignId: string): Promise<Record<string, { article: any; created_at: string | null }>> {
+    const response = await api.get(`/api/campaigns/${campaignId}/articles`);
+    return response.data;
+  },
 };
 
 export default api;

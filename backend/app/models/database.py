@@ -67,6 +67,7 @@ class Campaign(Base):
     agent_executions = relationship("AgentExecution", back_populates="campaign", cascade="all, delete-orphan")
     assets = relationship("Asset", back_populates="campaign", cascade="all, delete-orphan")
     results = relationship("CampaignResult", back_populates="campaign", uselist=False, cascade="all, delete-orphan")
+    generated_articles = relationship("GeneratedArticle", back_populates="campaign", cascade="all, delete-orphan")
     bi_reports = relationship("BIReport", back_populates="campaign", cascade="all, delete-orphan")
 
 
@@ -118,6 +119,20 @@ class CampaignResult(Base):
 
     # Relationships
     campaign = relationship("Campaign", back_populates="results")
+
+
+class GeneratedArticle(Base):
+    """Generated articles - persisted so users can view them after navigating away."""
+    __tablename__ = "generated_articles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id = Column(UUID(as_uuid=True), ForeignKey("campaigns.id"), nullable=False)
+    content_idea_id = Column(String(255), nullable=False)
+    article_data = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    campaign = relationship("Campaign", back_populates="generated_articles")
 
 
 class BIReport(Base):
