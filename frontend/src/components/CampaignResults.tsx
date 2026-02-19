@@ -371,8 +371,56 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
               </div>
             )}
 
-            {/* Content Ideas Section */}
-            {research_data.content_ideas && research_data.content_ideas.length > 0 && (
+          </div>
+        )}
+
+        {/* Content Panel */}
+        {activeTab === 'content' && (
+          <div className="panel-v2">
+            {content_outputs && (
+              <div className={`section-card-v2 ${collapsedSections.has('headlines') ? 'collapsed' : ''}`}>
+                <div className="section-header-v2" onClick={() => toggleSection('headlines')}>
+                  <h2><span>📝</span> Headlines & Taglines</h2>
+                  <span className="toggle">▼</span>
+                </div>
+                {!collapsedSections.has('headlines') && (
+                  <div className="section-content-v2">
+                    {content_outputs.hero_section && (
+                      <div className="hero-preview-v2">
+                        <div className="hero-badge">Hero Section</div>
+                        <h3>{content_outputs.hero_section.headline}</h3>
+                        <p>{content_outputs.hero_section.subheadline}</p>
+                        <button className="cta-preview">{content_outputs.hero_section.cta_text}</button>
+                      </div>
+                    )}
+
+                    {content_outputs.meta_tags && (
+                      <div className="accordion-v2">
+                        <div className="accordion-header-v2" onClick={() => toggleAccordion('seo-tags')}>
+                          <span>SEO Meta Tags</span>
+                          <span className="arrow">{openAccordions.has('seo-tags') ? '▼' : '▶'}</span>
+                        </div>
+                        {openAccordions.has('seo-tags') && (
+                          <div className="accordion-content-v2">
+                            <div className="meta-item-v2">
+                              <span className="label">Title:</span>
+                              <code>{content_outputs.meta_tags.meta_title}</code>
+                            </div>
+                            <div className="meta-item-v2">
+                              <span className="label">Description:</span>
+                              <code>{content_outputs.meta_tags.meta_description}</code>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Content Ideas & Article Generation */}
+            {research_data?.content_ideas && research_data.content_ideas.length > 0 && (
               <div className={`section-card-v2 ${collapsedSections.has('content-ideas') ? 'collapsed' : ''}`}>
                 <div className="section-header-v2" onClick={() => toggleSection('content-ideas')}>
                   <h2><span>💡</span> Content & Article Ideas <span className="badge">{research_data.content_ideas.length} ideas</span></h2>
@@ -455,51 +503,6 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
                 )}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Content Panel */}
-        {activeTab === 'content' && content_outputs && (
-          <div className="panel-v2">
-            <div className={`section-card-v2 ${collapsedSections.has('headlines') ? 'collapsed' : ''}`}>
-              <div className="section-header-v2" onClick={() => toggleSection('headlines')}>
-                <h2><span>📝</span> Headlines & Taglines</h2>
-                <span className="toggle">▼</span>
-              </div>
-              {!collapsedSections.has('headlines') && (
-                <div className="section-content-v2">
-                  {content_outputs.hero_section && (
-                    <div className="hero-preview-v2">
-                      <div className="hero-badge">Hero Section</div>
-                      <h3>{content_outputs.hero_section.headline}</h3>
-                      <p>{content_outputs.hero_section.subheadline}</p>
-                      <button className="cta-preview">{content_outputs.hero_section.cta_text}</button>
-                    </div>
-                  )}
-
-                  {content_outputs.meta_tags && (
-                    <div className="accordion-v2">
-                      <div className="accordion-header-v2" onClick={() => toggleAccordion('seo-tags')}>
-                        <span>SEO Meta Tags</span>
-                        <span className="arrow">{openAccordions.has('seo-tags') ? '▼' : '▶'}</span>
-                      </div>
-                      {openAccordions.has('seo-tags') && (
-                        <div className="accordion-content-v2">
-                          <div className="meta-item-v2">
-                            <span className="label">Title:</span>
-                            <code>{content_outputs.meta_tags.meta_title}</code>
-                          </div>
-                          <div className="meta-item-v2">
-                            <span className="label">Description:</span>
-                            <code>{content_outputs.meta_tags.meta_description}</code>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
