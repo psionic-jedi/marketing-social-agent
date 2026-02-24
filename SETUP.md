@@ -13,55 +13,69 @@ Quick start guide for getting the project running locally.
 
 ## Quick Start (Docker - Recommended)
 
-### 1. Clone the repository
+### 1. Clone and setup
 
 ```bash
 cd marketing-social-agent
+
+# Copy env template and see instructions
+make setup
 ```
 
-### 2. Set up environment variables
+### 2. Configure API keys
 
-```bash
-# Copy the example environment file
-cp backend/.env.example backend/.env.development
+Edit `backend/.env` and add your API keys:
 
-# Edit the file and add your API keys
-# Required:
-# - ANTHROPIC_API_KEY
-# - GOOGLE_API_KEY
-```
-
-Edit `backend/.env.development` and set your API keys:
 ```bash
 ANTHROPIC_API_KEY=sk-ant-your-actual-key-here
 GOOGLE_API_KEY=your-google-api-key-here
+SECRET_KEY=generate-with-python3-c-import-secrets-print-secrets-token_hex-32
 ```
 
 ### 3. Start all services
 
 ```bash
-# Start PostgreSQL, Redis, Backend, and Frontend
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
+make dev
 ```
 
-### 4. Access the application
+### 4. Run database migrations
+
+```bash
+make migrate
+```
+
+### 5. Access the application
 
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 
-### 5. Verify everything is working
+### 6. Verify everything is working
 
 ```bash
-# Check service health
 curl http://localhost:8000/health
-
-# Expected response:
-# {"status": "healthy"}
+# Expected: {"status": "healthy"}
 ```
+
+## Available Commands
+
+Run `make help` to see all available commands.
+
+| Command | Description |
+|---------|-------------|
+| `make setup` | Initial setup (copy env template) |
+| `make dev` | Start all Docker services |
+| `make stop` | Stop all services |
+| `make logs` | Follow all service logs |
+| `make logs-backend` | Follow backend logs only |
+| `make migrate` | Run database migrations |
+| `make migrate-new MSG="..."` | Generate new migration |
+| `make psql` | Open PostgreSQL shell |
+| `make shell` | Bash into backend container |
+| `make test` | Run backend tests |
+| `make status` | Show service status |
+| `make clean` | Stop and remove all data |
+| `make rebuild` | Full rebuild from scratch |
 
 ## Local Development (Without Docker)
 
@@ -78,11 +92,11 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Set up environment
-cp .env.example .env.development
-# Edit .env.development with your API keys
+cp .env.example .env
+# Edit .env with your API keys
 
 # Start PostgreSQL and Redis locally (or use Docker just for these)
-docker-compose up -d postgres redis
+docker compose up -d postgres redis
 
 # Run database migrations
 alembic upgrade head
@@ -162,21 +176,23 @@ REDIS_URL=redis://elasticache-endpoint:6379/0
 lsof -i :8000  # or :3000, :5432, :6379
 
 # Stop all containers and restart
-docker-compose down
-docker-compose up -d
+make stop
+make dev
 ```
 
 ### Database Connection Issues
 
 ```bash
 # Check if PostgreSQL is running
-docker-compose ps postgres
+make status
 
 # Check logs
-docker-compose logs postgres
+make logs-backend
 
-# Restart PostgreSQL
-docker-compose restart postgres
+# Restart with fresh database
+make clean
+make dev
+make migrate
 ```
 
 ### Storage Permissions
@@ -196,54 +212,6 @@ rm -rf node_modules package-lock.json
 npm install
 ```
 
-## Useful Commands
-
-```bash
-# View all service logs
-docker-compose logs -f
-
-# View specific service logs
-docker-compose logs -f backend
-docker-compose logs -f postgres
-
-# Stop all services
-docker-compose down
-
-# Stop and remove volumes (fresh start)
-docker-compose down -v
-
-# Rebuild containers
-docker-compose build --no-cache
-
-# Access PostgreSQL directly
-docker-compose exec postgres psql -U marketing_user -d marketing_agents
-
-# Access Redis CLI
-docker-compose exec redis redis-cli
-```
-
-## Next Steps
-
-Once the system is running:
-
-1. **Phase 1 (Current)**: Implement core agents
-   - Research Agent (web scraping & analysis)
-   - Content Agent (with Gemini 2.5 Flash)
-   - Basic UI for input and results
-
-2. **Test the API**:
-   ```bash
-   # Create a test campaign
-   curl -X POST http://localhost:8000/api/campaigns \
-     -H "Content-Type: application/json" \
-     -d '{
-       "category_url": "https://example.com/baby-sleepsuits",
-       "budget": 5000
-     }'
-   ```
-
-3. **Access API Documentation**: http://localhost:8000/docs
-
 ## Project Structure
 
 ```
@@ -257,6 +225,7 @@ marketing-social-agent/
 │   │   ├── schemas/         # Pydantic schemas
 │   │   ├── services/        # Business logic
 │   │   └── storage/         # Storage abstraction layer
+│   ├── alembic/             # Database migrations
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -268,6 +237,8 @@ marketing-social-agent/
 │   ├── package.json
 │   └── Dockerfile
 ├── docker-compose.yml
+├── Makefile
+├── CLAUDE.md               # Claude Code project context
 └── README.md               # Full specification
 ```
 
@@ -276,4 +247,4 @@ marketing-social-agent/
 For issues or questions:
 - Check the full specification in README.md
 - Review the troubleshooting section above
-- Check Docker logs: `docker-compose logs -f`
+- Check Docker logs: `make logs`

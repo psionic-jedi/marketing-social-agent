@@ -9,14 +9,14 @@ import uuid
 import logging
 
 from app.core.database import get_db_session
-from app.models.database import Campaign, CampaignStatus, CampaignResult, GeneratedArticle
+from app.models.database import Campaign, CampaignStatus, CampaignResult, GeneratedArticle, ApiUsageLog
 from app.schemas.campaign import CampaignCreate, CampaignResponse
 from app.services.article_generator import ArticleGenerator
 from app.tasks.campaign_tasks import execute_campaign_task
+from sqlalchemy import func
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-article_generator = ArticleGenerator()
 
 
 class ArticleGenerateRequest(BaseModel):
@@ -207,6 +207,7 @@ async def generate_article(
 
     # Generate the article
     try:
+        article_generator = ArticleGenerator(db=db, campaign_id=str(campaign_id))
         article = await article_generator.generate_full_article(
             title=request.title,
             intro=request.intro,
@@ -279,4 +280,89 @@ async def get_campaign_articles(
             "created_at": a.created_at.isoformat() if a.created_at else None
         }
         for a in articles
+    }
+
+
+@router.get("/campaigns/{campaign_id}/costs")
+async def get_campaign_costs(
+    campaign_id: uuid.UUID,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Get API usage costs for a campaign.
+
+    Returns per-agent breakdown and totals, plus individual call records.
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Campaign {campaign_id} not found"
+        )
+
+    # Get all usage logs for this campaign
+    logs = db.query(ApiUsageLog).filter(
+        ApiUsageLog.campaign_id == campaign_id
+    ).order_by(ApiUsageLog.created_at).all()
+
+    if not logs:
+        return {
+            "campaign_id": str(campaign_id),
+            "total_calls": 0,
+            "total_input_tokens": 0,
+            "total_output_tokens": 0,
+            "total_cost_usd": 0.0,
+            "by_agent": [],
+            "records": []
+        }
+
+    # Aggregate by agent
+    agent_stats = db.query(
+        ApiUsageLog.agent_name,
+        func.count(ApiUsageLog.id).label("calls"),
+        func.sum(ApiUsageLog.input_tokens).label("input_tokens"),
+        func.sum(ApiUsageLog.output_tokens).label("output_tokens"),
+        func.sum(ApiUsageLog.estimated_cost_usd).label("cost"),
+    ).filter(
+        ApiUsageLog.campaign_id == campaign_id
+    ).group_by(ApiUsageLog.agent_name).all()
+
+    by_agent = [
+        {
+            "agent_name": row.agent_name,
+            "calls": row.calls,
+            "input_tokens": row.input_tokens or 0,
+            "output_tokens": row.output_tokens or 0,
+            "cost_usd": round(float(row.cost or 0), 4),
+        }
+        for row in agent_stats
+    ]
+
+    # Build individual records
+    records = [
+        {
+            "agent_name": log.agent_name,
+            "call_type": log.call_type,
+            "model": log.model,
+            "input_tokens": log.input_tokens,
+            "output_tokens": log.output_tokens,
+            "cost_usd": round(float(log.estimated_cost_usd or 0), 6),
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log in logs
+    ]
+
+    total_input = sum(a["input_tokens"] for a in by_agent)
+    total_output = sum(a["output_tokens"] for a in by_agent)
+    total_cost = sum(a["cost_usd"] for a in by_agent)
+    total_calls = sum(a["calls"] for a in by_agent)
+
+    return {
+        "campaign_id": str(campaign_id),
+        "total_calls": total_calls,
+        "total_input_tokens": total_input,
+        "total_output_tokens": total_output,
+        "total_cost_usd": round(total_cost, 4),
+        "by_agent": by_agent,
+        "records": records,
     }

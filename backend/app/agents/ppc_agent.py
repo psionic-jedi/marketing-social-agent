@@ -44,8 +44,9 @@ class PPCAgent:
         'pouch': ['pouch', 'clutch', 'wash bag', 'toiletry']
     }
 
-    def __init__(self):
+    def __init__(self, cost_tracker=None):
         self.anthropic = Anthropic(api_key=settings.anthropic_api_key)
+        self.cost_tracker = cost_tracker
 
     def execute(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
@@ -155,9 +156,9 @@ class PPCAgent:
 
         for product in products:
             # Check product name, brand field, and description
-            name = product.get('name', '').lower()
-            brand = product.get('brand', '').lower()
-            description = product.get('description', '').lower()
+            name = (product.get('name') or '').lower()
+            brand = (product.get('brand') or '').lower()
+            description = (product.get('description') or '').lower()
 
             combined_text = f"{name} {brand} {description}"
 
@@ -176,8 +177,8 @@ class PPCAgent:
         type_products = {ptype: [] for ptype in self.PRODUCT_TYPES}
 
         for product in products:
-            name = product.get('name', '').lower()
-            description = product.get('description', '').lower()
+            name = (product.get('name') or '').lower()
+            description = (product.get('description') or '').lower()
             combined_text = f"{name} {description}"
 
             for product_type, keywords in self.PRODUCT_TYPES.items():
@@ -196,8 +197,8 @@ class PPCAgent:
 
         # Extract unique descriptors from product names
         for product in products:
-            name = product.get('name', '')
-            brand = product.get('brand', '')
+            name = product.get('name') or ''
+            brand = product.get('brand') or ''
 
             # Brand + category combinations
             if brand:
@@ -602,6 +603,9 @@ Return ONLY valid JSON:
                     messages=[{"role": "user", "content": prompt}]
                 )
 
+                if self.cost_tracker:
+                    self.cost_tracker.record(response, "ppc", f"ad_copy_{ad_group_name[:50]}")
+
                 import json
                 response_text = response.content[0].text.strip()
                 if response_text.startswith("```"):
@@ -670,7 +674,7 @@ Return ONLY valid JSON:
     def _get_url_paths(self, ad_group: Dict, category_name: str) -> tuple:
         """Generate appropriate URL paths based on ad group theme."""
         theme = ad_group.get("theme", "general")
-        cat_slug = category_name[:15].replace(" ", "-").lower()
+        cat_slug = ((category_name or '')[:15]).replace(" ", "-").lower()
 
         if theme == "brand":
             brand = ad_group.get("brand", "designer")

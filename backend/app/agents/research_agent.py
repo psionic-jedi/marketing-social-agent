@@ -23,9 +23,10 @@ logger = logging.getLogger(__name__)
 class ResearchAgent:
     """Research agent for gathering product and market intelligence."""
 
-    def __init__(self, use_mock_data: bool = None, progress_callback=None):
+    def __init__(self, use_mock_data: bool = None, progress_callback=None, cost_tracker=None):
         self.anthropic = Anthropic(api_key=settings.anthropic_api_key)
         self.progress_callback = progress_callback
+        self.cost_tracker = cost_tracker
         # Use config setting if not explicitly provided
         if use_mock_data is None:
             self.use_mock_data = not settings.use_real_scraping
@@ -646,6 +647,9 @@ If you cannot find certain fields, use null for that field."""
                 messages=[{"role": "user", "content": prompt}]
             )
 
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "research", "extract_product_detail")
+
             import json
             response_text = response.content[0].text.strip()
 
@@ -914,6 +918,9 @@ If you can't find specific products, return {{"products": [], "explanation": "re
                 messages=[{"role": "user", "content": prompt}]
             )
 
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "research", "parse_products")
+
             # Parse Claude's JSON response
             import json
             response_text = response.content[0].text.strip()
@@ -1125,6 +1132,9 @@ If you can't find prices, use the sample products data as fallback."""
                 messages=[{"role": "user", "content": prompt}]
             )
 
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "research", "analyze_category")
+
             import json
             response_text = response.content[0].text.strip()
             if response_text.startswith("```"):
@@ -1214,6 +1224,9 @@ Format as a clear list."""
                 temperature=0.5,
                 messages=[{"role": "user", "content": prompt}]
             )
+
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "research", "parent_questions")
 
             # For demo, return sample questions
             return [
@@ -1357,6 +1370,9 @@ Return ONLY valid JSON:
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             )
+
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "research", "content_ideas")
 
             import json
             response_text = response.content[0].text.strip()

@@ -134,7 +134,7 @@ class CRMAgent:
             "email_number": 1,
             "send_timing": "Immediately after signup",
             "subject_line": f"Welcome! Discover {', '.join(top_brands[:2])} & More {category_name}",
-            "preheader": f"Shop {top_brands[0]} and other designer {category_name.lower()} ✨",
+            "preheader": f"Shop {top_brands[0]} and other designer {(category_name or '').lower()} ✨",
             "content_blocks": [
                 {
                     "type": "hero",
@@ -170,7 +170,7 @@ class CRMAgent:
             "email_number": 2,
             "send_timing": "2 days after signup",
             "subject_line": f"Why Parents Love Our {category_name}: {feature_highlights[0]['title'] if feature_highlights else 'Quality & Style'}",
-            "preheader": f"Discover what makes our {category_name.lower()} special",
+            "preheader": f"Discover what makes our {(category_name or '').lower()} special",
             "content_blocks": [
                 {
                     "type": "header",
@@ -197,7 +197,7 @@ class CRMAgent:
 
         # Email 3: Brand Spotlight with Discount
         spotlight_brand = top_brands[0] if top_brands else "Designer"
-        brand_products = [p for p in products if p.get('brand', '').lower() == spotlight_brand.lower()][:3]
+        brand_products = [p for p in products if (p.get('brand') or '').lower() == spotlight_brand.lower()][:3]
         if not brand_products:
             brand_products = featured_products
 
@@ -208,7 +208,7 @@ class CRMAgent:
             "email_number": 3,
             "send_timing": "5 days after signup",
             "subject_line": f"🎁 15% Off {spotlight_brand} {category_name} - Your Welcome Gift",
-            "preheader": f"Exclusive: Save on {spotlight_brand} and designer {category_name.lower()}",
+            "preheader": f"Exclusive: Save on {spotlight_brand} and designer {(category_name or '').lower()}",
             "content_blocks": [
                 {
                     "type": "brand_spotlight",
@@ -244,7 +244,7 @@ class CRMAgent:
                 featured.append({
                     "name": product.get('name', 'Product')[:50],  # Truncate long names
                     "brand": brand,
-                    "price": product.get('price', 0),
+                    "price": product.get('price') or 0,
                     "image_url": image_url,
                     "url": product.get('url') or '/shop'
                 })
@@ -265,8 +265,8 @@ class CRMAgent:
 
         # Get price range for sale messaging
         price_range = research_data.get("category_insights", {}).get("price_range", {})
-        min_price = price_range.get("min", 20)
-        max_price = price_range.get("max", 200)
+        min_price = price_range.get("min") or 20
+        max_price = price_range.get("max") or 200
 
         # Extract key features for campaign messaging
         feature_titles = [f.get("title", "") for f in features[:3]] if features else ["Quality", "Comfort", "Style"]
@@ -275,7 +275,7 @@ class CRMAgent:
 
         # Campaign 1: Brand Spotlight - New Arrivals from Top Brand
         spotlight_brand = top_brands[0] if top_brands else "Designer"
-        brand_products = [p for p in products if p.get('brand', '').lower() == spotlight_brand.lower()][:4]
+        brand_products = [p for p in products if (p.get('brand') or '').lower() == spotlight_brand.lower()][:4]
         if not brand_products:
             brand_products = featured_products[:4]
 
@@ -312,7 +312,7 @@ class CRMAgent:
         if len(top_brands) >= 2:
             multi_brand_products = []
             for brand in top_brands[:3]:
-                brand_p = [p for p in products if p.get('brand', '').lower() == brand.lower()]
+                brand_p = [p for p in products if (p.get('brand') or '').lower() == brand.lower()]
                 if brand_p:
                     multi_brand_products.append(brand_p[0])
             if not multi_brand_products:
@@ -323,7 +323,7 @@ class CRMAgent:
                 "campaign_name": "Designer Brands Showcase",
                 "send_date": "Monthly - 3rd week",
                 "subject_line": f"Shop {', '.join(top_brands[:2])} & More {category_name}",
-                "preheader": f"Exclusive designer {category_name.lower()} from top brands",
+                "preheader": f"Exclusive designer {(category_name or '').lower()} from top brands",
                 "target_segment": "Luxury Buyers + Brand-conscious shoppers",
                 "goal": "Showcase brand variety and drive high-value sales",
                 "featured_brands": top_brands[:3],
@@ -334,8 +334,8 @@ class CRMAgent:
 
         # Campaign 4: Price-Point Campaign (Gift Guide style)
         mid_price = (min_price + max_price) / 2
-        price_products = sorted(products, key=lambda x: x.get('price', 0))
-        under_price_products = [p for p in price_products if p.get('price', 0) < mid_price][:3]
+        price_products = sorted(products, key=lambda x: x.get('price') or 0)
+        under_price_products = [p for p in price_products if (p.get('price') or 0) < mid_price][:3]
         if not under_price_products:
             under_price_products = featured_products[:3]
 
@@ -360,7 +360,7 @@ class CRMAgent:
             "campaign_name": "Seasonal Sale Event",
             "send_date": "Quarterly",
             "subject_line": f"Up to 30% Off {spotlight_brand}, {top_brands[1] if len(top_brands) > 1 else 'Designer'} & More {category_name}",
-            "preheader": f"Limited time: Designer {category_name.lower()} at exceptional prices",
+            "preheader": f"Limited time: Designer {(category_name or '').lower()} at exceptional prices",
             "target_segment": "All active subscribers + Previous buyers",
             "goal": "Drive volume sales and clear seasonal inventory",
             "featured_brands": top_brands[:3],
@@ -415,8 +415,8 @@ class CRMAgent:
 
         category_name = category_insights.get("category_name", "Products")
         price_range = category_insights.get("price_range", {})
-        min_price = price_range.get("min", 0)
-        max_price = price_range.get("max", 500)
+        min_price = price_range.get("min") or 0
+        max_price = price_range.get("max") or 500
 
         # Detect gender from category name
         gender = self._detect_gender(category_name)
@@ -548,7 +548,7 @@ class CRMAgent:
 
     def _detect_gender(self, category_name: str) -> str:
         """Detect gender from category name."""
-        name_lower = category_name.lower()
+        name_lower = (category_name or '').lower()
         if any(word in name_lower for word in ['boy', 'boys', 'male']):
             return "Boys"
         elif any(word in name_lower for word in ['girl', 'girls', 'female']):
@@ -561,7 +561,7 @@ class CRMAgent:
 
     def _detect_age_group(self, category_name: str, products: List[Dict]) -> str:
         """Detect age group from category and product data."""
-        name_lower = category_name.lower()
+        name_lower = (category_name or '').lower()
 
         # Check category name first
         if any(word in name_lower for word in ['baby', 'infant', 'newborn', '0-12', '0-24']):
@@ -575,7 +575,7 @@ class CRMAgent:
 
         # Check product names/descriptions for age hints
         for product in products[:10]:
-            name = product.get('name', '').lower()
+            name = (product.get('name') or '').lower()
             if any(word in name for word in ['baby', 'infant']):
                 return "Baby (0-2 years)"
             elif any(word in name for word in ['toddler']):
@@ -585,7 +585,7 @@ class CRMAgent:
 
     def _detect_product_type(self, category_name: str) -> str:
         """Detect product type from category name."""
-        name_lower = category_name.lower()
+        name_lower = (category_name or '').lower()
 
         product_types = {
             "Bags": ['bag', 'bags', 'backpack', 'rucksack'],
@@ -609,7 +609,7 @@ class CRMAgent:
         seen = set()
 
         for product in products:
-            brand = product.get('brand', '')
+            brand = product.get('brand') or ''
             if brand and brand.lower() not in seen:
                 seen.add(brand.lower())
                 brands.append(brand)
@@ -1389,7 +1389,7 @@ class CRMAgent:
     <mj-section background-color="#ffffff" padding="40px 40px 30px">
       <mj-column>
         <mj-text align="center" font-size="15px" line-height="26px" color="#333333" font-family="Arial, Helvetica, sans-serif">
-          Discover the latest {brand} {category_name.lower()} - exquisite design meets exceptional quality in every piece.
+          Discover the latest {brand} {(category_name or '').lower()} - exquisite design meets exceptional quality in every piece.
         </mj-text>
       </mj-column>
     </mj-section>
@@ -1530,7 +1530,7 @@ class CRMAgent:
     <mj-section background-color="#f9f7f5" padding="0 40px 40px">
       <mj-column>
         <mj-text align="center" font-size="15px" line-height="26px" color="#333333" font-family="Arial, Helvetica, sans-serif">
-          Discover our curated collection of designer {category_name.lower()} from the world's most prestigious brands.
+          Discover our curated collection of designer {(category_name or '').lower()} from the world's most prestigious brands.
         </mj-text>
       </mj-column>
     </mj-section>
@@ -1596,7 +1596,7 @@ class CRMAgent:
     <mj-section background-color="#f9f7f5" padding="0 40px 40px">
       <mj-column>
         <mj-text align="center" font-size="15px" line-height="26px" color="#333333" font-family="Arial, Helvetica, sans-serif">
-          Designer quality doesn't have to break the bank. Discover beautiful {category_name.lower()} at accessible price points.
+          Designer quality doesn't have to break the bank. Discover beautiful {(category_name or '').lower()} at accessible price points.
         </mj-text>
       </mj-column>
     </mj-section>
@@ -1664,7 +1664,7 @@ class CRMAgent:
     <mj-section background-color="#f9f7f5" padding="0 40px 40px">
       <mj-column>
         <mj-text align="center" font-size="15px" line-height="26px" color="#333333" font-family="Arial, Helvetica, sans-serif">
-          Designer {category_name.lower()} at exceptional prices. Don't miss out on these limited-time savings.
+          Designer {(category_name or '').lower()} at exceptional prices. Don't miss out on these limited-time savings.
         </mj-text>
       </mj-column>
     </mj-section>
@@ -1711,7 +1711,7 @@ class CRMAgent:
         for product in products[:4]:
             name = product.get('name', 'Product')[:40]
             brand = product.get('brand') or 'Designer'
-            price = product.get('price', 0)
+            price = product.get('price') or 0
             url = product.get('url') or '/shop'
 
             # Use actual image or create a nice placeholder

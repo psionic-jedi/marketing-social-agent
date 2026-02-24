@@ -35,12 +35,12 @@ class OverlordAgent:
     - Analyst Agent: Performance analysis and recommendations
     """
 
-    def __init__(self, progress_callback=None):
-        self.research_agent = ResearchAgent(progress_callback=progress_callback)
-        self.content_agent = ContentAgent()
-        self.social_media_agent = SocialMediaAgent()
-        self.ppc_agent = PPCAgent()
-        self.meta_ads_agent = MetaAdsAgent()
+    def __init__(self, progress_callback=None, cost_tracker=None):
+        self.research_agent = ResearchAgent(progress_callback=progress_callback, cost_tracker=cost_tracker)
+        self.content_agent = ContentAgent(cost_tracker=cost_tracker)
+        self.social_media_agent = SocialMediaAgent(cost_tracker=cost_tracker)
+        self.ppc_agent = PPCAgent(cost_tracker=cost_tracker)
+        self.meta_ads_agent = MetaAdsAgent(cost_tracker=cost_tracker)
         self.crm_agent = CRMAgent()
         self.analyst_agent = AnalystAgent()
         self.progress_callback = progress_callback

@@ -13,8 +13,10 @@ logger = logging.getLogger(__name__)
 class ArticleGenerator:
     """Service for generating full articles from content ideas."""
 
-    def __init__(self):
+    def __init__(self, db=None, campaign_id: str = None):
         self.anthropic = Anthropic(api_key=settings.anthropic_api_key)
+        self.db = db
+        self.campaign_id = campaign_id
 
     async def generate_full_article(
         self,
@@ -132,6 +134,14 @@ IMPORTANT: Return ONLY valid JSON in this exact format:
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             )
+
+            # Track cost if db session and campaign_id are available
+            if self.db and self.campaign_id:
+                try:
+                    from app.services.cost_tracker import save_single_usage
+                    save_single_usage(self.db, self.campaign_id, "article_generator", "generate_article", response)
+                except Exception as cost_err:
+                    logger.warning(f"Failed to save article generation cost: {cost_err}")
 
             import json
             response_text = response.content[0].text.strip()

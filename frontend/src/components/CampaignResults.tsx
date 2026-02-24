@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CampaignResults as CampaignResultsType, campaignService } from '../services/api';
+import { CampaignResults as CampaignResultsType, CampaignCosts, campaignService } from '../services/api';
 import './CampaignResults.css';
 
 interface CampaignResultsProps {
@@ -34,7 +34,7 @@ interface GeneratedArticle {
   faq?: Array<{ question: string; answer: string }>;
 }
 
-type TabType = 'overview' | 'research' | 'content' | 'social' | 'ppc' | 'meta' | 'crm' | 'analytics';
+type TabType = 'overview' | 'research' | 'content' | 'social' | 'ppc' | 'meta' | 'crm' | 'analytics' | 'costs';
 
 const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -45,6 +45,8 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
   const [generatedArticles, setGeneratedArticles] = useState<Record<string, GeneratedArticle>>({});
   const [viewingArticleId, setViewingArticleId] = useState<string | null>(null);
   const [articleError, setArticleError] = useState<string | null>(null);
+  const [costsData, setCostsData] = useState<CampaignCosts | null>(null);
+  const [costsLoading, setCostsLoading] = useState(false);
 
   // Load saved articles from the database on mount
   useEffect(() => {
@@ -67,6 +69,17 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
       loadSavedArticles();
     }
   }, [results.campaign_id]);
+
+  // Lazy-load costs when the tab is clicked
+  useEffect(() => {
+    if (activeTab === 'costs' && !costsData && !costsLoading) {
+      setCostsLoading(true);
+      campaignService.getCampaignCosts(results.campaign_id)
+        .then(data => setCostsData(data))
+        .catch(err => console.error('Error loading costs:', err))
+        .finally(() => setCostsLoading(false));
+    }
+  }, [activeTab, costsData, costsLoading, results.campaign_id]);
 
   const handleGenerateArticle = async (idea: any) => {
     setGeneratingArticle(idea.id);
@@ -151,6 +164,7 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
     { id: 'meta', label: 'Meta Ads', icon: '📘' },
     { id: 'crm', label: 'Email & CRM', icon: '📧' },
     { id: 'analytics', label: 'Analytics', icon: '📊' },
+    { id: 'costs', label: 'Costs', icon: '💲' },
   ];
 
   return (
@@ -1202,6 +1216,134 @@ const CampaignResults: React.FC<CampaignResultsProps> = ({ results, onDelete }) 
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Costs Panel */}
+        {activeTab === 'costs' && (
+          <div className="panel-v2">
+            {costsLoading && (
+              <div className="costs-loading">
+                <span className="spinner"></span> Loading cost data...
+              </div>
+            )}
+            {costsData && (
+              <>
+                {/* Summary Cards */}
+                <div className="costs-summary-grid">
+                  <div className="costs-summary-card">
+                    <h3>Total API Calls</h3>
+                    <div className="value">{costsData.total_calls}</div>
+                  </div>
+                  <div className="costs-summary-card">
+                    <h3>Input Tokens</h3>
+                    <div className="value">{costsData.total_input_tokens.toLocaleString()}</div>
+                  </div>
+                  <div className="costs-summary-card">
+                    <h3>Output Tokens</h3>
+                    <div className="value">{costsData.total_output_tokens.toLocaleString()}</div>
+                  </div>
+                  <div className="costs-summary-card highlight">
+                    <h3>Estimated Cost</h3>
+                    <div className="value">${costsData.total_cost_usd.toFixed(4)}</div>
+                  </div>
+                </div>
+
+                {/* Per-Agent Breakdown */}
+                {costsData.by_agent.length > 0 && (
+                  <div className={`section-card-v2 ${collapsedSections.has('costs-by-agent') ? 'collapsed' : ''}`}>
+                    <div className="section-header-v2" onClick={() => toggleSection('costs-by-agent')}>
+                      <h2><span>📊</span> Cost by Agent</h2>
+                      <span className="toggle">▼</span>
+                    </div>
+                    {!collapsedSections.has('costs-by-agent') && (
+                      <div className="section-content-v2">
+                        <table className="data-table-v2">
+                          <thead>
+                            <tr>
+                              <th>Agent</th>
+                              <th>Calls</th>
+                              <th>Input Tokens</th>
+                              <th>Output Tokens</th>
+                              <th>Cost (USD)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {costsData.by_agent.map((agent, idx) => (
+                              <tr key={idx}>
+                                <td className="primary">{agent.agent_name}</td>
+                                <td>{agent.calls}</td>
+                                <td>{agent.input_tokens.toLocaleString()}</td>
+                                <td>{agent.output_tokens.toLocaleString()}</td>
+                                <td className="highlight">${agent.cost_usd.toFixed(4)}</td>
+                              </tr>
+                            ))}
+                            <tr className="costs-total-row">
+                              <td className="primary"><strong>Total</strong></td>
+                              <td><strong>{costsData.total_calls}</strong></td>
+                              <td><strong>{costsData.total_input_tokens.toLocaleString()}</strong></td>
+                              <td><strong>{costsData.total_output_tokens.toLocaleString()}</strong></td>
+                              <td className="highlight"><strong>${costsData.total_cost_usd.toFixed(4)}</strong></td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Detailed Records */}
+                {costsData.records.length > 0 && (
+                  <div className={`section-card-v2 ${collapsedSections.has('costs-detail') ? 'collapsed' : ''}`}>
+                    <div className="section-header-v2" onClick={() => toggleSection('costs-detail')}>
+                      <h2><span>📋</span> Individual API Calls <span className="badge">{costsData.records.length} calls</span></h2>
+                      <span className="toggle">▼</span>
+                    </div>
+                    {!collapsedSections.has('costs-detail') && (
+                      <div className="section-content-v2">
+                        <div className="costs-table-wrapper">
+                          <table className="data-table-v2 costs-detail-table">
+                            <thead>
+                              <tr>
+                                <th>Agent</th>
+                                <th>Call Type</th>
+                                <th>Model</th>
+                                <th>In</th>
+                                <th>Out</th>
+                                <th>Cost</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {costsData.records.map((record, idx) => (
+                                <tr key={idx}>
+                                  <td>{record.agent_name}</td>
+                                  <td className="primary">{record.call_type}</td>
+                                  <td><span className="tag-v2">{record.model?.split('-').slice(-1)[0] || record.model}</span></td>
+                                  <td>{record.input_tokens.toLocaleString()}</td>
+                                  <td>{record.output_tokens.toLocaleString()}</td>
+                                  <td>${record.cost_usd.toFixed(6)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {costsData.total_calls === 0 && (
+                  <div className="costs-empty">
+                    <p>No API usage data recorded for this campaign yet.</p>
+                  </div>
+                )}
+              </>
+            )}
+            {!costsLoading && !costsData && (
+              <div className="costs-empty">
+                <p>No cost data available for this campaign.</p>
               </div>
             )}
           </div>

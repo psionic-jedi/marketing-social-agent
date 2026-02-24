@@ -49,6 +49,34 @@ export interface CampaignResults {
   } | null;
 }
 
+export interface CampaignCostsAgent {
+  agent_name: string;
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+}
+
+export interface CampaignCostRecord {
+  agent_name: string;
+  call_type: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  created_at: string | null;
+}
+
+export interface CampaignCosts {
+  campaign_id: string;
+  total_calls: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cost_usd: number;
+  by_agent: CampaignCostsAgent[];
+  records: CampaignCostRecord[];
+}
+
 export const campaignService = {
   /**
    * Create a new campaign
@@ -110,6 +138,14 @@ export const campaignService = {
    */
   async getArticles(campaignId: string): Promise<Record<string, { article: any; created_at: string | null }>> {
     const response = await api.get(`/api/campaigns/${campaignId}/articles`);
+    return response.data;
+  },
+
+  /**
+   * Get API usage costs for a campaign
+   */
+  async getCampaignCosts(campaignId: string): Promise<CampaignCosts> {
+    const response = await api.get<CampaignCosts>(`/api/campaigns/${campaignId}/costs`);
     return response.data;
   },
 };

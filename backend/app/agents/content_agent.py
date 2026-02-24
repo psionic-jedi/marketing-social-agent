@@ -24,8 +24,9 @@ logger = logging.getLogger(__name__)
 class ContentAgent:
     """Content agent for generating marketing content and images."""
 
-    def __init__(self):
+    def __init__(self, cost_tracker=None):
         self.anthropic = Anthropic(api_key=settings.anthropic_api_key)
+        self.cost_tracker = cost_tracker
         genai.configure(api_key=settings.google_api_key)
         self.gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
@@ -142,6 +143,9 @@ IMPORTANT: Return ONLY valid JSON in this exact format:
                 messages=[{"role": "user", "content": prompt}]
             )
 
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "content", "generate_hero")
+
             # Parse Claude's JSON response
             import json
             response_text = response.content[0].text.strip()
@@ -222,6 +226,9 @@ IMPORTANT: Return ONLY valid JSON in this exact format:
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             )
+
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "content", "generate_features")
 
             # Parse Claude's JSON response
             import json
@@ -311,6 +318,9 @@ Length: 150-200 words"""
                 messages=[{"role": "user", "content": prompt}]
             )
 
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "content", "generate_description")
+
             return response.content[0].text
 
         except Exception as e:
@@ -358,6 +368,9 @@ IMPORTANT:
                 temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             )
+
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "content", "generate_meta_tags")
 
             import json
             response_text = response.content[0].text.strip()

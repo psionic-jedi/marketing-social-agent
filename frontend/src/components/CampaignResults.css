@@ -1636,3 +1636,89 @@
   border-color: rgba(16, 185, 129, 0.5);
   transform: scale(1.02);
 }
+
+/* ============================================
+   Costs Tab Styles
+   ============================================ */
+
+.costs-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.95rem;
+}
+
+.costs-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.costs-summary-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.costs-summary-card h3 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 0.5rem;
+}
+
+.costs-summary-card .value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.costs-summary-card.highlight {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.costs-summary-card.highlight .value {
+  color: #818cf8;
+}
+
+.costs-total-row {
+  border-top: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.costs-total-row td {
+  padding-top: 0.75rem !important;
+}
+
+.costs-table-wrapper {
+  overflow-x: auto;
+}
+
+.costs-detail-table {
+  font-size: 0.8rem;
+}
+
+.costs-detail-table th,
+.costs-detail-table td {
+  padding: 0.5rem 0.6rem;
+  white-space: nowrap;
+}
+
+.costs-empty {
+  text-align: center;
+  padding: 3rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 768px) {
+  .costs-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

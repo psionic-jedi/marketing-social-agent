@@ -67,8 +67,9 @@ class MetaAdsAgent:
         'catalog_sales': 'Dynamic product ads from catalog'
     }
 
-    def __init__(self):
+    def __init__(self, cost_tracker=None):
         self.anthropic = Anthropic(api_key=settings.anthropic_api_key)
+        self.cost_tracker = cost_tracker
 
     def execute(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
@@ -716,6 +717,9 @@ Respond in this exact JSON format:
                 max_tokens=2000,
                 messages=[{"role": "user", "content": prompt}]
             )
+
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "meta_ads", "generate_ad_copy")
 
             response_text = response.content[0].text
 

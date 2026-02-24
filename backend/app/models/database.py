@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import (
-    Column, String, DateTime, Numeric, Date, Text,
+    Column, String, DateTime, Numeric, Date, Text, Integer, Float,
     ForeignKey, Enum as SQLEnum
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -69,6 +69,7 @@ class Campaign(Base):
     results = relationship("CampaignResult", back_populates="campaign", uselist=False, cascade="all, delete-orphan")
     generated_articles = relationship("GeneratedArticle", back_populates="campaign", cascade="all, delete-orphan")
     bi_reports = relationship("BIReport", back_populates="campaign", cascade="all, delete-orphan")
+    api_usage_logs = relationship("ApiUsageLog", back_populates="campaign", cascade="all, delete-orphan")
 
 
 class AgentExecution(Base):
@@ -147,3 +148,21 @@ class BIReport(Base):
 
     # Relationships
     campaign = relationship("Campaign", back_populates="bi_reports")
+
+
+class ApiUsageLog(Base):
+    """Tracks individual Anthropic API calls for cost visibility."""
+    __tablename__ = "api_usage_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id = Column(UUID(as_uuid=True), ForeignKey("campaigns.id"), nullable=False)
+    agent_name = Column(String(100), nullable=False)
+    call_type = Column(String(255), nullable=False)
+    model = Column(String(100))
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    estimated_cost_usd = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    campaign = relationship("Campaign", back_populates="api_usage_logs")

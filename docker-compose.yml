@@ -41,13 +41,13 @@ services:
     container_name: marketing-agent-backend
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
+      # Override for Docker networking (container hostnames, not localhost)
       - DATABASE_URL=postgresql://marketing_user:marketing_pass@postgres:5432/marketing_agents
       - REDIS_URL=redis://redis:6379/0
-      - STORAGE_TYPE=local
       - LOCAL_STORAGE_PATH=/app/storage
-      - DEBUG=true
-      - ENVIRONMENT=development
     volumes:
       - ./backend:/app
       - backend_storage:/app/storage
@@ -64,13 +64,13 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: marketing-agent-celery
+    env_file:
+      - ./backend/.env
     environment:
+      # Override for Docker networking (container hostnames, not localhost)
       - DATABASE_URL=postgresql://marketing_user:marketing_pass@postgres:5432/marketing_agents
       - REDIS_URL=redis://redis:6379/0
-      - STORAGE_TYPE=local
       - LOCAL_STORAGE_PATH=/app/storage
-      - DEBUG=true
-      - ENVIRONMENT=development
     volumes:
       - ./backend:/app
       - backend_storage:/app/storage

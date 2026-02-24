@@ -14,6 +14,7 @@ import uuid
 from app.models.database import Campaign, CampaignStatus, CampaignResult, AgentExecution, AgentStatus
 from app.agents.state import create_initial_state
 from app.agents.overlord import OverlordAgent
+from app.services.cost_tracker import CostTracker
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +61,11 @@ class CampaignService:
                 except Exception as e:
                     logger.error(f"Failed to update progress: {e}", exc_info=True)
 
-            # Create overlord with progress callback
-            overlord = OverlordAgent(progress_callback=update_progress)
+            # Create cost tracker for this campaign
+            cost_tracker = CostTracker(campaign_id=str(campaign_id))
+
+            # Create overlord with progress callback and cost tracker
+            overlord = OverlordAgent(progress_callback=update_progress, cost_tracker=cost_tracker)
 
             # Create initial state
             initial_state = create_initial_state(
@@ -80,6 +84,12 @@ class CampaignService:
             except Exception as exec_error:
                 logger.error(f"Workflow execution failed for campaign {campaign_id}: {exec_error}", exc_info=True)
                 raise
+
+            # Flush cost tracking data
+            try:
+                cost_tracker.flush(db)
+            except Exception as cost_err:
+                logger.warning(f"Failed to flush cost data: {cost_err}")
 
             # Save results to database
             await self._save_results(campaign_id, final_state, db)
@@ -105,6 +115,12 @@ class CampaignService:
 
         except Exception as e:
             logger.error(f"Campaign {campaign_id} execution failed: {e}", exc_info=True)
+
+            # Flush any partial cost data even on failure
+            try:
+                cost_tracker.flush(db)
+            except Exception as cost_err:
+                logger.warning(f"Failed to flush cost data on failure: {cost_err}")
 
             # Update campaign status to failed
             campaign.status = CampaignStatus.FAILED

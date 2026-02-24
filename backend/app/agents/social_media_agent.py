@@ -22,8 +22,9 @@ logger = logging.getLogger(__name__)
 class SocialMediaAgent:
     """Social media agent for creating social media content and strategy."""
 
-    def __init__(self):
+    def __init__(self, cost_tracker=None):
         self.anthropic = Anthropic(api_key=settings.anthropic_api_key)
+        self.cost_tracker = cost_tracker
 
     def execute(self, state: MarketingCampaignState) -> MarketingCampaignState:
         """
@@ -142,6 +143,9 @@ IMPORTANT: Return ONLY valid JSON:
                 temperature=0.8,
                 messages=[{"role": "user", "content": prompt}]
             )
+
+            if self.cost_tracker:
+                self.cost_tracker.record(response, "social_media", "instagram_posts")
 
             import json
             response_text = response.content[0].text.strip()
