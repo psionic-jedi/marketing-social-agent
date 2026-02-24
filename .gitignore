@@ -67,6 +67,13 @@ dist/
 # Docker
 docker-compose.override.yml
 
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+
 # Alembic - migration files are source code and must be committed
 
 # Generated files
